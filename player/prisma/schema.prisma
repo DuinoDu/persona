@@ -1,0 +1,79 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Audio {
+  id           String   @id @default(cuid())
+  filename     String   @unique
+  filepath     String
+  date         String
+  startTime    String
+  endTime      String
+  personTag    String
+  lastPosition Float    @default(0)
+  createdAt    DateTime @default(now())
+}
+
+model Feedback {
+  id             String   @id @default(cuid())
+  audioId        String?
+  audioFilename  String?
+  audioDate      String?
+  audioPersonTag String?
+  audioStartTime String?
+  audioEndTime   String?
+  subtitleFile   String
+  subtitleIndex  Int?
+  subtitleStart  Float?
+  subtitleEnd    Float?
+  subtitleText   String?
+  subtitleSourceKind  String?
+  subtitleSourcePath  String?
+  subtitleSourceIndex Int?
+  subtitleAbsStart    Float?
+  subtitleAbsEnd      Float?
+  message        String
+  processingStatus String   @default("待处理")
+  processedAt     DateTime?
+  repairStatus     String   @default("pending")
+  repairSummary    String?
+  repairConfidence Float?
+  repairedText     String?
+  repairPatchJson  String?
+  repairError      String?
+  repairedAt       DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  repairJobs     FeedbackRepairJob[]
+}
+
+model FeedbackRepairJob {
+  id            String   @id @default(cuid())
+  feedbackId    String
+  status        String   @default("pending")
+  attempt       Int      @default(0)
+  model         String?
+  promptVersion String?
+  inputJson     String?
+  outputJson    String?
+  patchJson     String?
+  error         String?
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  feedback      Feedback @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([feedbackId, createdAt])
+}

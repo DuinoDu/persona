@@ -1,0 +1,282 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.schemas/process_youtube/annotation_v1/conversation_record.schema.json",
+  "title": "Persona Conversation Record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "record_type",
+    "version",
+    "conversation_id",
+    "source",
+    "turns",
+    "meta",
+    "audit"
+  ],
+  "properties": {
+    "record_type": {
+      "type": "string",
+      "const": "conversation"
+    },
+    "version": {
+      "type": "string",
+      "const": "annotation_v1"
+    },
+    "conversation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "project": {
+          "type": "string",
+          "const": "ququ_youtube"
+        },
+        "year": {
+          "type": "string",
+          "minLength": 1
+        },
+        "episode_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "episode_title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "raw_source_file": {
+          "type": "string",
+          "minLength": 1
+        },
+        "language": {
+          "type": "string",
+          "const": "zh"
+        },
+        "persona_name": {
+          "type": "string",
+          "const": "曲曲"
+        },
+        "section_file": {
+          "type": "string",
+          "minLength": 1
+        },
+        "section_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "section_kind": {
+          "type": "string",
+          "const": "call"
+        },
+        "persona": {
+          "type": "string"
+        },
+        "start": {
+          "type": "number"
+        },
+        "end": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "project",
+        "year",
+        "episode_id",
+        "episode_title",
+        "raw_source_file",
+        "section_file",
+        "section_index",
+        "section_kind",
+        "language",
+        "persona_name",
+        "start",
+        "end"
+      ]
+    },
+    "turns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "turn_index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "persona"
+            ]
+          },
+          "speaker_id": {
+            "type": "string",
+            "enum": [
+              "guest",
+              "host"
+            ]
+          },
+          "speaker_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "start": {
+            "type": "number"
+          },
+          "end": {
+            "type": "number"
+          },
+          "text": {
+            "type": "string"
+          },
+          "section_file": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sentence_start_idx": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sentence_end_idx": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "turn_index",
+          "role",
+          "speaker_id",
+          "speaker_name",
+          "start",
+          "end",
+          "text"
+        ]
+      },
+      "minItems": 2
+    },
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "topic_primary": {
+          "type": "string",
+          "enum": [
+            "relationship",
+            "marriage",
+            "career",
+            "money",
+            "family",
+            "self_growth",
+            "emotion",
+            "education",
+            "social",
+            "health",
+            "other"
+          ]
+        },
+        "topic_secondary": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "relationship",
+              "marriage",
+              "career",
+              "money",
+              "family",
+              "self_growth",
+              "emotion",
+              "education",
+              "social",
+              "health",
+              "other"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "guest_persona": {
+          "type": "string"
+        },
+        "transcript_quality": {
+          "type": "string",
+          "enum": [
+            "A",
+            "B",
+            "C"
+          ]
+        },
+        "train_split": {
+          "type": "string",
+          "enum": [
+            "train",
+            "dev",
+            "test",
+            "holdout"
+          ]
+        },
+        "safety_flags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "medical",
+              "legal",
+              "self_harm",
+              "violence",
+              "sexual",
+              "privacy",
+              "minor",
+              "other"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "topic_primary",
+        "transcript_quality",
+        "train_split"
+      ]
+    },
+    "audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "annotation_status": {
+          "type": "string",
+          "enum": [
+            "draft",
+            "reviewed",
+            "frozen"
+          ]
+        },
+        "annotator_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reviewer_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "annotation_status",
+        "annotator_id",
+        "created_at"
+      ]
+    }
+  }
+}

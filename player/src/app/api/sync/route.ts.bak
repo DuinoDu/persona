@@ -1,0 +1,221 @@
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import fs from "fs";
+import path from "path";
+import { execSync } from "child_process";
+
+interface RawTextJson {
+  date?: string;
+  date_original?: string;
+  tag?: string;
+  guest_tag?: string;
+  audience_tag?: string;
+  viewer_tag?: string;
+  start_time: number;
+  end_time: number;
+}
+
+function formatTimestamp(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  return `${h.toString().padStart(2, "0")}${m.toString().padStart(2, "0")}${s.toString().padStart(2, "0")}`;
+}
+
+function formatTimeDisplay(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+}
+
+function formatFfmpegTime(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 3600 % 60;
+  return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toFixed(2).padStart(5, "0")}`;
+}
+
+function extractDateFromFilename(filename: string): string | null {
+  const base = path.basename(filename);
+  const cnMatch = base.match(/^(\d+年\d+月\d+日)/);
+  if (cnMatch) return cnMatch[1];
+  const compactMatch = base.match(/^(\d{4})(\d{2})(\d{2})/);
+  if (!compactMatch) return null;
+  const [, y, m, d] = compactMatch;
+  return `${Number(y)}年${Number(m)}月${Number(d)}日`;
+}
+
+function extractTagFromFilename(filename: string): string | null {
+  const base = path.basename(filename).replace(/\.[^/.]+$/, "");
+  const match = base.match(/^(.+?)_(\d{6})[-_](\d{6})_(.+)$/);
+  return match ? match[4] : null;
+}
+
+function normalizeTag(value?: string | null): string | null {
+  if (!value) return null;
+  const trimmed = String(value).trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function resolveTag(json: RawTextJson, jsonFilename: string): string | null {
+  return (
+    normalizeTag(json.tag) ||
+    normalizeTag(json.guest_tag) ||
+    normalizeTag(json.audience_tag) ||
+    normalizeTag(json.viewer_tag) ||
+    normalizeTag(extractTagFromFilename(jsonFilename))
+  );
+}
+
+function sanitizeTagForFilename(tag: string): string {
+  return tag.replace(/[\/\\]/g, "-").replace(/\s+/g, " ").trim();
+}
+
+function listFilesRecursive(dir: string, ext: string): string[] {
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  const files: string[] = [];
+
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...listFilesRecursive(fullPath, ext));
+    } else if (entry.isFile() && entry.name.endsWith(ext)) {
+      files.push(fullPath);
+    }
+  }
+
+  return files;
+}
+
+export async function POST() {
+  const baseDir = path.join(process.cwd(), "public", "audios");
+  const rawTextsDir =
+    process.env.RAW_TEXTS_DIR || path.join(baseDir, "raw_texts");
+  const rawAudiosDir =
+    process.env.RAW_AUDIOS_DIR || path.join(baseDir, "raw_audios");
+  const conversationsDir = path.join(baseDir, "conversations");
+
+  if (!fs.existsSync(rawTextsDir)) {
+    return NextResponse.json({ error: "raw_texts directory not found" }, { status: 404 });
+  }
+
+  if (!fs.existsSync(conversationsDir)) {
+    fs.mkdirSync(conversationsDir, { recursive: true });
+  }
+
+  const rawAudioFiles = fs.existsSync(rawAudiosDir)
+    ? listFilesRecursive(rawAudiosDir, ".mp3")
+    : [];
+
+  const jsonFiles = listFilesRecursive(rawTextsDir, ".json");
+  const results = { added: 0, updated: 0, skipped: 0, errors: [] as string[] };
+
+  for (const jsonPath of jsonFiles) {
+    const jsonFile = path.basename(jsonPath);
+    const jsonContent = JSON.parse(fs.readFileSync(jsonPath, "utf-8")) as RawTextJson;
+
+    // Use date_original from JSON, or extract from filename as fallback
+    const date_original =
+      jsonContent.date_original ||
+      jsonContent.date ||
+      extractDateFromFilename(jsonFile);
+    if (!date_original) {
+      results.errors.push(`Cannot determine date for: ${jsonFile}`);
+      continue;
+    }
+
+    const { start_time, end_time } = jsonContent;
+    const resolvedTag = resolveTag(jsonContent, jsonFile);
+    const safeTag = resolvedTag ? sanitizeTagForFilename(resolvedTag) : "unknown";
+    const startTs = formatTimestamp(start_time);
+    const endTs = formatTimestamp(end_time);
+    const outputFilename = `${date_original}_${startTs}_${endTs}_${safeTag}.mp3`;
+    const outputPath = path.join(conversationsDir, outputFilename);
+    const startDisplay = formatTimeDisplay(start_time);
+    const endDisplay = formatTimeDisplay(end_time);
+
+    // Check if already in database
+    const existing = await prisma.audio.findUnique({ where: { filename: outputFilename } });
+    if (existing) {
+      results.skipped++;
+      continue;
+    }
+
+    const existingByTime = await prisma.audio.findFirst({
+      where: { date: date_original, startTime: startDisplay, endTime: endDisplay },
+    });
+
+    if (safeTag === "unknown" && existingByTime) {
+      results.skipped++;
+      continue;
+    }
+
+    // Check if output file already exists
+    if (!fs.existsSync(outputPath)) {
+      if (existingByTime?.filename) {
+        const oldPath = path.join(conversationsDir, existingByTime.filename);
+        if (fs.existsSync(oldPath)) {
+          fs.renameSync(oldPath, outputPath);
+        }
+      }
+
+      if (!fs.existsSync(outputPath)) {
+      // Find matching raw audio file by date
+      const rawAudioPath = rawAudioFiles.find((filePath) =>
+        path.basename(filePath).includes(date_original)
+      );
+      if (!rawAudioPath) {
+        results.errors.push(`No raw audio found for date: ${date_original}`);
+        continue;
+      }
+
+      const duration = end_time - start_time;
+
+      try {
+        execSync(
+          `ffmpeg -i "${rawAudioPath}" -ss ${formatFfmpegTime(start_time)} -t ${duration} -c copy "${outputPath}" -y`,
+          { stdio: "pipe" }
+        );
+      } catch (err) {
+        results.errors.push(`ffmpeg error for ${jsonFile}: ${err}`);
+        continue;
+      }
+      }
+    }
+
+    // Add to database
+    if (existingByTime) {
+      if (
+        existingByTime.filename === outputFilename &&
+        existingByTime.personTag === safeTag
+      ) {
+        results.skipped++;
+        continue;
+      }
+      await prisma.audio.update({
+        where: { id: existingByTime.id },
+        data: {
+          filename: outputFilename,
+          filepath: `/audios/conversations/${outputFilename}`,
+          personTag: safeTag,
+        },
+      });
+      results.updated++;
+    } else {
+      await prisma.audio.create({
+        data: {
+          filename: outputFilename,
+          filepath: `/audios/conversations/${outputFilename}`,
+          date: date_original,
+          startTime: startDisplay,
+          endTime: endDisplay,
+          personTag: safeTag,
+        },
+      });
+      results.added++;
+    }
+  }
+
+  return NextResponse.json(results);
+}

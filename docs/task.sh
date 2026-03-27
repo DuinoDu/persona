@@ -1,0 +1,1 @@
+/home/duino/code/scripts/prd/daily/05_ququai.sh

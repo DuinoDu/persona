@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "FeedbackRepairOutput",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "decision",
+    "confidence",
+    "summary",
+    "operation",
+    "correctedText",
+    "updatedPrevText",
+    "updatedNextText"
+  ],
+  "properties": {
+    "decision": {
+      "type": "string",
+      "enum": ["APPLY", "NEEDS_HUMAN", "REJECT"]
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "operation": {
+      "type": ["string", "null"],
+      "enum": ["REPLACE_CURRENT", "MOVE_PREFIX_TO_PREV", "MOVE_SUFFIX_TO_NEXT", null]
+    },
+    "correctedText": {
+      "type": ["string", "null"]
+    },
+    "updatedPrevText": {
+      "type": ["string", "null"]
+    },
+    "updatedNextText": {
+      "type": ["string", "null"]
+    }
+  }
+}

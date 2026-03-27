@@ -1,0 +1,27 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.log
+.DS_Store
+*.pid
+
+# Data directories (large files, not tracked)
+data/01_downloads/
+data/02_audio_splits/
+data/03_transcripts/
+data/04_conversations/
+
+# Temp files
+temp_*.json
+conversation_analysis*.json
+.tmp*
+tmp*
+.codex_tmp
+.conductor
+.tmux_runs
+.work_002_review
+data
+formatted_output.json

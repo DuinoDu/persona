@@ -1,0 +1,344 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.schemas/process_youtube/annotation_v1/preference_pair_record.schema.json",
+  "title": "Persona Preference Pair Record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "record_type",
+    "version",
+    "pair_id",
+    "source",
+    "context",
+    "chosen_reply",
+    "rejected_reply",
+    "judgement",
+    "audit"
+  ],
+  "properties": {
+    "record_type": {
+      "type": "string",
+      "const": "preference_pair"
+    },
+    "version": {
+      "type": "string",
+      "const": "annotation_v1"
+    },
+    "pair_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "project": {
+          "type": "string",
+          "const": "ququ_youtube"
+        },
+        "year": {
+          "type": "string",
+          "minLength": 1
+        },
+        "episode_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "episode_title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "raw_source_file": {
+          "type": "string",
+          "minLength": 1
+        },
+        "language": {
+          "type": "string",
+          "const": "zh"
+        },
+        "persona_name": {
+          "type": "string",
+          "const": "曲曲"
+        },
+        "source_turn_sample_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "project",
+        "year",
+        "episode_id",
+        "episode_title",
+        "raw_source_file",
+        "language",
+        "persona_name",
+        "source_turn_sample_id"
+      ]
+    },
+    "context": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "turn_index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "persona"
+            ]
+          },
+          "speaker_id": {
+            "type": "string",
+            "enum": [
+              "guest",
+              "host"
+            ]
+          },
+          "speaker_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "start": {
+            "type": "number"
+          },
+          "end": {
+            "type": "number"
+          },
+          "text": {
+            "type": "string"
+          },
+          "section_file": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sentence_start_idx": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sentence_end_idx": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "turn_index",
+          "role",
+          "speaker_id",
+          "speaker_name",
+          "start",
+          "end",
+          "text"
+        ]
+      },
+      "minItems": 1
+    },
+    "chosen_reply": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "candidate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provenance": {
+          "type": "string",
+          "enum": [
+            "human",
+            "sft_model",
+            "general_model",
+            "edited_negative",
+            "hard_negative"
+          ]
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "candidate_id",
+        "provenance",
+        "text"
+      ]
+    },
+    "rejected_reply": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "candidate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provenance": {
+          "type": "string",
+          "enum": [
+            "human",
+            "sft_model",
+            "general_model",
+            "edited_negative",
+            "hard_negative"
+          ]
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "candidate_id",
+        "provenance",
+        "text"
+      ]
+    },
+    "judgement": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "style_similarity_winner": {
+          "type": "string",
+          "enum": [
+            "chosen",
+            "rejected",
+            "tie"
+          ]
+        },
+        "structure_similarity_winner": {
+          "type": "string",
+          "enum": [
+            "chosen",
+            "rejected",
+            "tie"
+          ]
+        },
+        "value_alignment_winner": {
+          "type": "string",
+          "enum": [
+            "chosen",
+            "rejected",
+            "tie"
+          ]
+        },
+        "naturalness_winner": {
+          "type": "string",
+          "enum": [
+            "chosen",
+            "rejected",
+            "tie"
+          ]
+        },
+        "intent_hit_winner": {
+          "type": "string",
+          "enum": [
+            "chosen",
+            "rejected",
+            "tie"
+          ]
+        },
+        "ooc_risk_higher": {
+          "type": "string",
+          "enum": [
+            "chosen",
+            "rejected",
+            "tie"
+          ]
+        },
+        "blandness_higher": {
+          "type": "string",
+          "enum": [
+            "chosen",
+            "rejected",
+            "tie"
+          ]
+        },
+        "templaticness_higher": {
+          "type": "string",
+          "enum": [
+            "chosen",
+            "rejected",
+            "tie"
+          ]
+        },
+        "preference_strength": {
+          "type": "string",
+          "enum": [
+            "weak",
+            "medium",
+            "strong"
+          ]
+        },
+        "overall_reason_labels": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "more_like_persona",
+              "better_structure_match",
+              "better_value_alignment",
+              "better_multi_turn_consistency",
+              "more_natural",
+              "less_ooc",
+              "less_bland",
+              "less_templatic",
+              "better_intent_hit"
+            ]
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "style_similarity_winner",
+        "structure_similarity_winner",
+        "value_alignment_winner",
+        "naturalness_winner",
+        "intent_hit_winner",
+        "ooc_risk_higher",
+        "blandness_higher",
+        "templaticness_higher",
+        "preference_strength",
+        "overall_reason_labels"
+      ]
+    },
+    "audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "annotation_status": {
+          "type": "string",
+          "enum": [
+            "draft",
+            "reviewed",
+            "frozen"
+          ]
+        },
+        "annotator_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reviewer_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "annotation_status",
+        "annotator_id",
+        "created_at"
+      ]
+    }
+  }
+}

@@ -1,0 +1,306 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.schemas/process_youtube/annotation_v1/benchmark_record.schema.json",
+  "title": "Persona Benchmark Case Record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "record_type",
+    "version",
+    "benchmark_id",
+    "category",
+    "messages",
+    "expected",
+    "audit"
+  ],
+  "properties": {
+    "record_type": {
+      "type": "string",
+      "const": "benchmark_case"
+    },
+    "version": {
+      "type": "string",
+      "const": "annotation_v1"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "normal_qa",
+        "multi_turn_followup",
+        "adversarial",
+        "cross_topic",
+        "ooc_trap"
+      ]
+    },
+    "messages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "turn_index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "persona"
+            ]
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "turn_index",
+          "role",
+          "text"
+        ]
+      },
+      "minItems": 1
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target_reply_types": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "direct_answer",
+              "correct_then_answer",
+              "clarify_then_answer",
+              "counter_question",
+              "framework_breakdown",
+              "advice",
+              "value_judgment",
+              "example",
+              "refute_or_correct",
+              "boundary_setting",
+              "summary_then_advice",
+              "other"
+            ]
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "target_style_tones": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "calm",
+              "sharp",
+              "restrained",
+              "gentle",
+              "humorous",
+              "teasing",
+              "direct",
+              "reserved"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "target_structure_patterns": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "conclusion_first",
+              "define_then_answer",
+              "question_first",
+              "correct_premise_first",
+              "framework_first",
+              "example_first",
+              "compare_options_first",
+              "other"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "target_reasoning_patterns": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "definition_clarification",
+              "causal_analysis",
+              "tradeoff_analysis",
+              "counterexample_test",
+              "boundary_setting",
+              "problem_reframing",
+              "resource_constraint_check",
+              "goal_alignment_check",
+              "other"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "target_value_signals": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "long_termism",
+              "realism",
+              "user_value_first",
+              "business_closure_first",
+              "anti_false_proposition",
+              "anti_empty_talk",
+              "result_oriented",
+              "honest_reservation",
+              "other"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "required_interaction_policies": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "asks_clarifying_question_first": {
+              "type": "boolean"
+            },
+            "corrects_premise_first": {
+              "type": "boolean"
+            },
+            "reduces_complexity_first": {
+              "type": "boolean"
+            },
+            "refuses_invalid_premise": {
+              "type": "boolean"
+            },
+            "comforts_emotion_explicitly": {
+              "type": "boolean"
+            },
+            "reframes_problem": {
+              "type": "boolean"
+            }
+          }
+        },
+        "must_not_have": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "max_ooc_risk": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "reference_answer": {
+          "type": "string"
+        },
+        "rubric_notes": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "target_reply_types",
+        "max_ooc_risk"
+      ]
+    },
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "topic_primary": {
+          "type": "string",
+          "enum": [
+            "relationship",
+            "marriage",
+            "career",
+            "money",
+            "family",
+            "self_growth",
+            "emotion",
+            "education",
+            "social",
+            "health",
+            "other"
+          ]
+        },
+        "topic_secondary": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "relationship",
+              "marriage",
+              "career",
+              "money",
+              "family",
+              "self_growth",
+              "emotion",
+              "education",
+              "social",
+              "health",
+              "other"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "transcript_derived": {
+          "type": "boolean"
+        },
+        "source_file": {
+          "type": "string"
+        },
+        "train_split": {
+          "type": "string",
+          "enum": [
+            "dev",
+            "test",
+            "holdout"
+          ]
+        }
+      }
+    },
+    "audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "annotation_status": {
+          "type": "string",
+          "enum": [
+            "draft",
+            "reviewed",
+            "frozen"
+          ]
+        },
+        "annotator_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reviewer_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "annotation_status",
+        "annotator_id",
+        "created_at"
+      ]
+    }
+  }
+}

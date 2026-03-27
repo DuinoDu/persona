@@ -1,0 +1,26 @@
+[project]
+name = "speech2text"
+version = "0.1.0"
+description = "中文双人对话语音转文本工具 - 基于 Whisper + pyannote"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "torch>=2.0.0",
+    "torchaudio>=2.0.0",
+    "numpy>=1.24.0",
+    "faster-whisper>=1.0.0",
+    "pyannote.audio>=3.1.0",
+    "click>=8.0.0",
+    "rich>=13.0.0",
+    "httpx[socks]>=0.28.1",
+]
+
+[project.scripts]
+transcribe = "speech2text.transcribe:main"
+
+[tool.uv]
+package = true
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

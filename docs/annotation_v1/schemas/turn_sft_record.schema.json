@@ -1,0 +1,325 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.schemas/process_youtube/annotation_v1/turn_sft_record.schema.json",
+  "title": "Persona Turn-level SFT Record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "record_type",
+    "version",
+    "sample_id",
+    "source",
+    "history",
+    "target_reply",
+    "meta",
+    "audit"
+  ],
+  "properties": {
+    "record_type": {
+      "type": "string",
+      "const": "turn_sft"
+    },
+    "version": {
+      "type": "string",
+      "const": "annotation_v1"
+    },
+    "sample_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "project": {
+          "type": "string",
+          "const": "ququ_youtube"
+        },
+        "year": {
+          "type": "string",
+          "minLength": 1
+        },
+        "episode_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "episode_title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "raw_source_file": {
+          "type": "string",
+          "minLength": 1
+        },
+        "language": {
+          "type": "string",
+          "const": "zh"
+        },
+        "persona_name": {
+          "type": "string",
+          "const": "曲曲"
+        },
+        "conversation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "section_file": {
+          "type": "string",
+          "minLength": 1
+        },
+        "section_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "turn_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "target_start": {
+          "type": "number"
+        },
+        "target_end": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "project",
+        "year",
+        "episode_id",
+        "episode_title",
+        "raw_source_file",
+        "language",
+        "persona_name",
+        "conversation_id",
+        "section_file",
+        "section_index",
+        "turn_index",
+        "target_start",
+        "target_end"
+      ]
+    },
+    "history": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "turn_index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "persona"
+            ]
+          },
+          "speaker_id": {
+            "type": "string",
+            "enum": [
+              "guest",
+              "host"
+            ]
+          },
+          "speaker_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "start": {
+            "type": "number"
+          },
+          "end": {
+            "type": "number"
+          },
+          "text": {
+            "type": "string"
+          },
+          "section_file": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sentence_start_idx": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sentence_end_idx": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "turn_index",
+          "role",
+          "speaker_id",
+          "speaker_name",
+          "start",
+          "end",
+          "text"
+        ]
+      }
+    },
+    "target_reply": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "turn_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "start": {
+          "type": "number"
+        },
+        "end": {
+          "type": "number"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "turn_index",
+        "start",
+        "end",
+        "text"
+      ]
+    },
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "reply_type": {
+          "type": "string",
+          "enum": [
+            "direct_answer",
+            "correct_then_answer",
+            "clarify_then_answer",
+            "counter_question",
+            "framework_breakdown",
+            "advice",
+            "value_judgment",
+            "example",
+            "refute_or_correct",
+            "boundary_setting",
+            "summary_then_advice",
+            "other"
+          ]
+        },
+        "topic_primary": {
+          "type": "string",
+          "enum": [
+            "relationship",
+            "marriage",
+            "career",
+            "money",
+            "family",
+            "self_growth",
+            "emotion",
+            "education",
+            "social",
+            "health",
+            "other"
+          ]
+        },
+        "topic_secondary": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "relationship",
+              "marriage",
+              "career",
+              "money",
+              "family",
+              "self_growth",
+              "emotion",
+              "education",
+              "social",
+              "health",
+              "other"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "difficulty": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "user_emotion": {
+          "type": "string",
+          "enum": [
+            "neutral",
+            "confused",
+            "anxious",
+            "angry",
+            "sad",
+            "excited",
+            "ashamed",
+            "defensive",
+            "mixed",
+            "unknown"
+          ]
+        },
+        "transcript_quality": {
+          "type": "string",
+          "enum": [
+            "A",
+            "B",
+            "C"
+          ]
+        },
+        "style_label_id": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "reply_type",
+        "topic_primary",
+        "difficulty",
+        "user_emotion",
+        "transcript_quality"
+      ]
+    },
+    "audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "annotation_status": {
+          "type": "string",
+          "enum": [
+            "draft",
+            "reviewed",
+            "frozen"
+          ]
+        },
+        "annotator_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reviewer_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "annotation_status",
+        "annotator_id",
+        "created_at"
+      ]
+    }
+  }
+}
