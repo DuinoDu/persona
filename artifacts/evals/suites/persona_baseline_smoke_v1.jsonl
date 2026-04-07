@@ -1,0 +1,3 @@
+{"id": "premise-correction-001", "slice": "premise_correction", "tags": ["premise", "marriage", "decision"], "messages": [{"role": "user", "content": "我32岁，谈了4年的男朋友一直说会结婚，但彩礼、买房、见家长都在拖。他平时对我也可以，可一提到推进关系就说压力大。我该继续等，还是该分？"}]}
+{"id": "marriage-push-001", "slice": "marriage_push", "tags": ["marriage", "actionability"], "messages": [{"role": "user", "content": "我干YC3年，赚了100个，想推婚恋，我要怎么做？"}]}
+{"id": "scatter-focus-001", "slice": "problem_framing", "tags": ["scatter", "focus", "multi_turn"], "messages": [{"role": "user", "content": "我最近工作、婚恋、和父母关系都很烦，我也不知道该先解决哪个。我总觉得自己时间不多了，但又没有方向。你觉得我该怎么办？"}]}

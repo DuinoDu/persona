@@ -25,3 +25,34 @@ tmp*
 .work_002_review
 data
 formatted_output.json
+
+# Remote-only caches and local toolchains
+.cache/
+.localbin/
+.localnode/
+.pkg/
+.runtime_cache/
+.venv
+.venv/
+
+# Training/eval artifacts
+artifacts/*
+!artifacts/evals/
+artifacts/evals/*
+!artifacts/evals/suites/
+!artifacts/evals/suites/**
+outputs/
+runtime_logs/
+
+# Player local build/runtime files
+player/.next/
+player/prisma/dev.db*
+
+# Vendored third-party source trees used only on H20
+third_party/
+
+# Script backups and bytecode
+scripts/evals/*.bak_*
+scripts/evals/__pycache__/
+scripts/sft/*.bak_*
+scripts/sft/__pycache__/

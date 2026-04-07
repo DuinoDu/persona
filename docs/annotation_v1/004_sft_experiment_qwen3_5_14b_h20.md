@@ -1,8 +1,10 @@
-# Qwen3.5-14B + LLaMA-Factory + 单卡 H20 SFT 实验方案（基于当前数据）
+# Qwen3.5-9B + LLaMA-Factory + 单卡 H20 SFT 实验方案（基于当前数据）
 
 ## 1. 任务概述
 
-本文档给出一套基于当前仓库数据现状、使用 **LLaMA-Factory** 对 **Qwen3.5-14B** 在 **单卡 H20** 上进行 Persona SFT 的完整实验方案。
+本文档给出一套基于当前仓库数据现状、使用 **LLaMA-Factory** 对 **Qwen3.5-9B** 在 **单卡 H20** 上进行 Persona SFT 的完整实验方案。
+
+> 勘误（2026-03-27）：在 h20 实际落地时，任务书原写法 `Qwen3.5-14B-Instruct` / `Qwen/Qwen3.5-14B-Instruct` 无法解析，且当前 LLaMA-Factory 内置模型表对应的官方公开 Qwen3.5 规格不包含 14B。为保证 smoke 可执行，仓库内实现统一改为使用官方可下载的 `Qwen/Qwen3.5-9B`，并保留 `template: qwen3_5` 与 `enable_thinking: false`。下文凡出现模型规格与执行配置不一致时，以该勘误和仓库中的实际 YAML 为准。
 
 目标不是直接开始最终训练，而是把：
 
@@ -20,7 +22,7 @@
 
 ### 2.1 主要目标
 
-在单卡 H20 上，用 LLaMA-Factory 跑出一版可复现的 **Qwen3.5-14B Persona SFT baseline**，并完成分阶段实验：
+在单卡 H20 上，用 LLaMA-Factory 跑出一版可复现的 **Qwen3.5-9B Persona SFT baseline**，并完成分阶段实验：
 
 1. **先做 Turn-only baseline**
 2. **再做 Turn + conversation 混合训练**
@@ -45,7 +47,7 @@
 
 - 当前 `data/05_annotations/sft_v1/` 数据现状评估
 - LLaMA-Factory 数据格式映射方案
-- Qwen3.5-14B 在单卡 H20 上的训练资源与配置建议
+- Qwen3.5-9B 在单卡 H20 上的训练资源与配置建议
 - SFT 三阶段实验矩阵
 - 离线评测、人工抽检、阶段 gate
 - 文档、配置、产物目录约定
@@ -136,7 +138,7 @@
 
 ### 5.1 模型
 
-- **主模型**：Qwen3.5-14B-Instruct
+- **主模型**：Qwen3.5-9B
 - **训练方式**：QLoRA 4-bit
 - **训练目标**：先做 persona imitation，不追求 full finetune
 
@@ -168,7 +170,7 @@
 
 ### 6.2 训练方式选择
 
-对于 Qwen3.5-14B：
+对于 Qwen3.5-9B：
 
 - **推荐**：QLoRA 4-bit
 - **可选**：QLoRA 8-bit
@@ -210,7 +212,7 @@
 
 ### 6.4 显存与吞吐判断
 
-对 Qwen3.5-14B + 单卡 H20：
+对 Qwen3.5-9B + 单卡 H20：
 
 - **4k**：稳定可跑
 - **8k**：可跑，但吞吐下降明显
@@ -400,7 +402,7 @@ system anchor 不是为了“硬控人设”，而是为了给训练提供稳定
 
 验证：
 
-- Qwen3.5-14B + LLaMA-Factory + H20 单卡训练链路可用
+- Qwen3.5-9B + LLaMA-Factory + H20 单卡训练链路可用
 - 数据格式转换正确
 - checkpoint / eval / inference 全流程可跑
 
@@ -424,7 +426,7 @@ system anchor 不是为了“硬控人设”，而是为了给训练提供稳定
 
 ### 产物
 
-- `exp_sft_smoke_qwen3_5_14b_h20/`
+- `exp_sft_smoke_qwen3_5_9b_h20/`
 
 ### 验收
 
@@ -452,7 +454,7 @@ system anchor 不是为了“硬控人设”，而是为了给训练提供稳定
 
 ### 配置（推荐）
 
-- model：Qwen3.5-14B-Instruct
+- model：Qwen3.5-9B
 - template：LLaMA-Factory 对应 Qwen3.5 官方模板（以安装版本实际名称为准）
 - finetuning_type：lora
 - quantization_bit：4
@@ -479,7 +481,7 @@ system anchor 不是为了“硬控人设”，而是为了给训练提供稳定
 
 ### 产物
 
-- `exp_sft_turn_only_qwen3_5_14b_h20_v1/`
+- `exp_sft_turn_only_qwen3_5_9b_h20_v1/`
 
 ### 验收
 
@@ -521,7 +523,7 @@ system anchor 不是为了“硬控人设”，而是为了给训练提供稳定
 
 ### 产物
 
-- `exp_sft_mix_qwen3_5_14b_h20_v1/`
+- `exp_sft_mix_qwen3_5_9b_h20_v1/`
 
 ### 验收
 
@@ -573,7 +575,7 @@ system anchor 不是为了“硬控人设”，而是为了给训练提供稳定
 
 ### 产物
 
-- `exp_sft_curriculum_qwen3_5_14b_h20_v1/`
+- `exp_sft_curriculum_qwen3_5_9b_h20_v1/`
 
 ### 验收
 
@@ -600,10 +602,10 @@ artifacts/llamafactory_data/
   ququ_hard_cases_v1_train.jsonl
 
 outputs/
-  exp_sft_smoke_qwen3_5_14b_h20/
-  exp_sft_turn_only_qwen3_5_14b_h20_v1/
-  exp_sft_mix_qwen3_5_14b_h20_v1/
-  exp_sft_curriculum_qwen3_5_14b_h20_v1/
+  exp_sft_smoke_qwen3_5_9b_h20/
+  exp_sft_turn_only_qwen3_5_9b_h20_v1/
+  exp_sft_mix_qwen3_5_9b_h20_v1/
+  exp_sft_curriculum_qwen3_5_9b_h20_v1/
 ```
 
 ---
@@ -656,7 +658,7 @@ outputs/
 
 ```yaml
 stage: sft
-model_name_or_path: Qwen/Qwen3.5-14B-Instruct
+model_name_or_path: Qwen/Qwen3.5-9B
 finetuning_type: lora
 template: qwen3_5
 quantization_bit: 4
@@ -685,7 +687,7 @@ plot_loss: true
 
 ```yaml
 stage: sft
-model_name_or_path: Qwen/Qwen3.5-14B-Instruct
+model_name_or_path: Qwen/Qwen3.5-9B
 finetuning_type: lora
 template: qwen3_5
 quantization_bit: 4
@@ -715,6 +717,7 @@ plot_loss: true
 - 若当前版本模板名不是 `qwen3_5`，以安装版本支持的正式名字为准
 - 若 Qwen3.5 需要更新版 `transformers` / `vllm` / `accelerate`，优先升级依赖后再训练
 - 先做 500 step smoke，再做正式全量训练
+- 勘误（2026-03-27，H20 实测）：若 `quantization_bit: 4` 在当前依赖栈下长期停留在 `Loading weights / Materializing param`，则 P0 smoke 可切换为 `bf16 + LoRA` 非量化配置先验证单卡 H20 可训练性；正式 baseline 再回到 4-bit 方案复核。
 
 ---
 
@@ -857,7 +860,7 @@ plot_loss: true
 
 ## 19. 最终建议（一句话）
 
-**当前先用 `conversation_v1` 做单卡 H20 的 Qwen3.5-14B smoke；等 2024 修复和 `turn_sft_v1` 冻结后，正式训练顺序固定为：先 turn-only，再 turn + conversation mix，最后再决定是否上 curriculum。**
+**当前先用 `conversation_v1` 做单卡 H20 的 Qwen3.5-9B smoke；等 2024 修复和 `turn_sft_v1` 冻结后，正式训练顺序固定为：先 turn-only，再 turn + conversation mix，最后再决定是否上 curriculum。**
 
 ---
 

@@ -1,0 +1,52 @@
+### model
+model_name_or_path: /vita-vepfs-data/fileset1/usr_data/yueyu/ws/persona/.cache/modelscope/Qwen/Qwen3.5-9B
+trust_remote_code: true
+low_cpu_mem_usage: false
+flash_attn: auto
+gradient_checkpointing: true
+
+### method
+stage: sft
+do_train: true
+do_eval: false
+finetuning_type: lora
+lora_rank: 8
+lora_alpha: 16
+lora_dropout: 0.05
+lora_target: q_proj,v_proj
+
+### dataset
+dataset_dir: artifacts/llamafactory_data
+dataset: ququ_conversation_v1_train
+eval_dataset: ququ_conversation_v1_dev
+template: qwen3_5
+enable_thinking: false
+cutoff_len: 4096
+overwrite_cache: true
+preprocessing_num_workers: 8
+dataloader_num_workers: 0
+dataloader_pin_memory: false
+
+### output
+output_dir: outputs/exp_sft_smoke_qwen3_5_9b_h20
+logging_steps: 10
+save_steps: 100
+eval_steps: 50
+eval_strategy: steps
+save_total_limit: 3
+plot_loss: true
+overwrite_output_dir: true
+save_only_model: false
+report_to: none
+
+### train
+per_device_train_batch_size: 1
+per_device_eval_batch_size: 1
+gradient_accumulation_steps: 1
+learning_rate: 2.0e-4
+num_train_epochs: 1.0
+max_steps: 100
+lr_scheduler_type: cosine
+warmup_ratio: 0.03
+bf16: true
+ddp_timeout: 180000000

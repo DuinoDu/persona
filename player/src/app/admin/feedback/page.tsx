@@ -102,6 +102,12 @@ export default async function FeedbackAdminPage() {
               导出 CSV
             </a>
             <Link
+              href="/admin/evals"
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition"
+            >
+              评测中心
+            </Link>
+            <Link
               href="/"
               className="rounded-lg bg-gray-800 px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 transition"
             >

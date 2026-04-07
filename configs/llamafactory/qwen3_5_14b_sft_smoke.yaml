@@ -1,0 +1,51 @@
+### model
+model_name_or_path: Qwen/Qwen3.5-9B
+trust_remote_code: true
+quantization_bit: 4
+quantization_method: bnb
+flash_attn: auto
+
+### method
+stage: sft
+do_train: true
+do_eval: true
+finetuning_type: lora
+lora_rank: 64
+lora_alpha: 128
+lora_dropout: 0.05
+lora_target: all
+
+### dataset
+dataset_dir: artifacts/llamafactory_data
+dataset: ququ_conversation_v1_train
+eval_dataset: ququ_conversation_v1_dev
+template: qwen3_5
+enable_thinking: false
+cutoff_len: 4096
+overwrite_cache: true
+preprocessing_num_workers: 8
+dataloader_num_workers: 4
+
+### output
+output_dir: outputs/exp_sft_smoke_qwen3_5_9b_h20
+logging_steps: 10
+save_steps: 100
+eval_steps: 100
+eval_strategy: steps
+save_total_limit: 3
+plot_loss: true
+overwrite_output_dir: true
+save_only_model: false
+report_to: none
+
+### train
+per_device_train_batch_size: 2
+per_device_eval_batch_size: 1
+gradient_accumulation_steps: 16
+learning_rate: 2.0e-4
+num_train_epochs: 1.0
+max_steps: 500
+lr_scheduler_type: cosine
+warmup_ratio: 0.03
+bf16: true
+ddp_timeout: 180000000
