@@ -1,5 +1,7 @@
 export * from "./personaRuntime";
 export * from "./personaContextBuilder";
+export * from "./personaMemory";
+export * from "./personaToolLoop";
 export * from "./personaArtifacts";
 export * from "./evalArtifacts";
 export * from "./remoteJobs";

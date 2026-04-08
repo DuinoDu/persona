@@ -240,6 +240,8 @@ model LiveSession {
   scenario          String?
   notes             String?
   summaryText       String?
+  memoryStateJson   String?
+  lastMemoryUpdatedAt DateTime?
   transcriptJson    String?
   inferHost         InferHost?       @relation(fields: [inferHostId], references: [id], onDelete: SetNull)
   modelDeployment   ModelDeployment? @relation(fields: [modelDeploymentId], references: [id], onDelete: SetNull)

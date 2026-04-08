@@ -3,6 +3,7 @@ import {
   buildPersonaInferenceRequest,
   buildRuntimeSignature,
   normalizeGenerationConfig,
+  type PersonaMessage,
   toRemoteGenerationBody,
   type GenerationConfig,
 } from "./personaRuntime";
@@ -24,6 +25,7 @@ export interface LiveDeploymentLike {
   serviceBaseUrl?: string | null;
   serviceChatPath?: string | null;
   serviceStreamPath?: string | null;
+  contextBuilderConfigJson?: string | null;
 }
 
 export interface PrepareLiveSessionInferenceInput {
@@ -36,7 +38,9 @@ export interface PrepareLiveSessionInferenceInput {
   source: string;
   systemPrompt?: string | null;
   summary?: string | null;
+  extraContextMessages?: PersonaMessage[];
   maxInputTokens?: number | null;
+  maxRecentTurns?: number | null;
   extraTraceMeta?: Record<string, unknown> | null;
 }
 
@@ -55,6 +59,10 @@ export interface PreparedLiveSessionInference {
     messages: ReturnType<typeof buildPersonaContext>["messages"];
   };
   conversationMessages: ReturnType<typeof buildPersonaContext>["messages"];
+  contextSettings: {
+    maxInputTokens: number;
+    maxRecentTurns: number;
+  };
 }
 
 export function readTrimmedString(value: unknown) {
@@ -77,6 +85,29 @@ export function jsonStringOrNull(value: unknown) {
     return null;
   }
   return JSON.stringify(value);
+}
+
+function parseJsonObject(value: string | null | undefined) {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value);
+    return typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+function readPositiveInt(value: unknown, fallback: number) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+}
+
+export function resolveLiveContextSettings(value: string | null | undefined) {
+  const record = parseJsonObject(value);
+  return {
+    maxInputTokens: readPositiveInt(record?.maxInputTokens, 12000),
+    maxRecentTurns: readPositiveInt(record?.maxRecentTurns, 8),
+  };
 }
 
 export function resolveLiveServicePort(baseUrl: string | null | undefined, slug: string) {
@@ -109,6 +140,7 @@ export function prepareLiveSessionInference(
 ): PreparedLiveSessionInference {
   const content = readTrimmedString(input.content);
   const generation = normalizeGenerationConfig(input.generation);
+  const contextSettings = resolveLiveContextSettings(input.deployment.contextBuilderConfigJson);
   const port = resolveLiveServicePort(input.deployment.serviceBaseUrl, input.deployment.slug);
   const artifacts = buildLiveServiceArtifacts(
     input.inferHost.workspacePath,
@@ -122,8 +154,10 @@ export function prepareLiveSessionInference(
     nextUserMessage: content,
     systemPrompt: input.systemPrompt ?? null,
     summary: input.summary ?? input.session.summaryText ?? null,
-    maxInputTokens: input.maxInputTokens ?? 262144,
+    extraMessages: input.extraContextMessages ?? [],
+    maxInputTokens: input.maxInputTokens ?? contextSettings.maxInputTokens,
     reserveOutputTokens: generation.maxNewTokens,
+    maxRecentTurns: input.maxRecentTurns ?? contextSettings.maxRecentTurns,
   });
   const runtimeSignature = buildRuntimeSignature({
     deploymentId: input.deployment.id,
@@ -175,5 +209,6 @@ export function prepareLiveSessionInference(
     hostConfig,
     inferenceBody,
     conversationMessages: context.messages.filter((message) => message.role !== "system"),
+    contextSettings,
   };
 }

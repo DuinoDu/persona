@@ -5,6 +5,13 @@ import {
   prepareLiveSessionInference,
   readTrimmedString,
 } from "@ququ/agent/liveSessionRuntime";
+import {
+  buildPersonaSummaryText,
+  parsePersonaMemoryState,
+  seedPersonaMemoryState,
+  updatePersonaMemoryState,
+} from "../personaMemory";
+import { runPersonaToolLoop } from "../personaToolLoop";
 import { buildPersonaTraceEnvelope } from "@ququ/agent/personaRuntime";
 import {
   buildRemoteHttpCommand,
@@ -26,7 +33,7 @@ async function loadLiveSessionGraph(db: AgentDbClient, sessionId: string) {
     where: { id: sessionId },
     include: {
       inferHost: true,
-      modelDeployment: { include: { inferHost: true } },
+      modelDeployment: { include: { inferHost: true, contextBuilderProfile: true } },
       turns: { orderBy: { createdAt: "asc" } },
     },
   });
@@ -58,6 +65,53 @@ function resolveLiveSessionContext(session: any): LiveSessionContext {
     session,
     deployment,
     inferHost,
+  };
+}
+
+function buildPreparedLiveSessionInput(input: {
+  session: any;
+  deployment: any;
+  inferHost: any;
+  content: string;
+  body: Record<string, unknown>;
+  source: string;
+}) {
+  const memoryState = parsePersonaMemoryState(input.session.memoryStateJson);
+  const toolLoop = runPersonaToolLoop({
+    query: input.content,
+    memoryState,
+    turns: input.session.turns,
+  });
+  const prepared = prepareLiveSessionInference({
+    session: input.session,
+    deployment: {
+      ...input.deployment,
+      contextBuilderConfigJson: input.deployment.contextBuilderProfile?.configJson ?? null,
+    },
+    inferHost: input.inferHost,
+    turns: input.session.turns,
+    content: input.content,
+    generation: parseRequestedGeneration(input.body),
+    source: input.source,
+    summary: buildPersonaSummaryText(memoryState) ?? input.session.summaryText ?? null,
+    extraContextMessages: toolLoop.messages,
+    extraTraceMeta: {
+      toolLoop: {
+        tools: toolLoop.plan.tools,
+        reasons: toolLoop.plan.reasons,
+        recallCounts: {
+          profile: toolLoop.recall.profile.length,
+          facts: toolLoop.recall.facts.length,
+          openLoops: toolLoop.recall.openLoops.length,
+          episodes: toolLoop.recall.episodes.length,
+        },
+      },
+    },
+  });
+
+  return {
+    prepared,
+    toolLoop,
   };
 }
 
@@ -141,6 +195,15 @@ async function persistLiveSessionSuccess(input: {
         remoteArtifactPath: readTrimmedString(payload.trace_path) || null,
       }),
     });
+    const nextMemoryState = updatePersonaMemoryState({
+      state: parsePersonaMemoryState(input.session.memoryStateJson),
+      userText: input.prepared.content,
+      assistantText: input.outputText,
+      scenario: input.session.scenario,
+      sourceTurnIds: [createdUserTurn.id, createdAssistantTurn.id],
+      updatedAt: createdAssistantTurn.createdAt,
+    });
+    const nextSummaryText = buildPersonaSummaryText(nextMemoryState);
 
     const deploymentData = input.streaming
       ? {
@@ -174,11 +237,14 @@ async function persistLiveSessionSuccess(input: {
         data: {
           status: "active",
           transcriptJson: JSON.stringify(transcript),
+          summaryText: nextSummaryText,
+          memoryStateJson: JSON.stringify(nextMemoryState),
+          lastMemoryUpdatedAt: new Date(),
           notes: input.session.notes,
         },
         include: {
           inferHost: true,
-          modelDeployment: true,
+          modelDeployment: { include: { inferHost: true, contextBuilderProfile: true } },
           turns: { orderBy: { createdAt: "asc" } },
         },
       }),
@@ -261,7 +327,7 @@ async function persistLiveSessionError(input: {
       },
       include: {
         inferHost: true,
-        modelDeployment: true,
+        modelDeployment: { include: { inferHost: true, contextBuilderProfile: true } },
         turns: { orderBy: { createdAt: "asc" } },
       },
     }),
@@ -289,7 +355,7 @@ export async function listLiveSessionsService(input: {
     take: 30,
     include: {
       inferHost: true,
-      modelDeployment: true,
+      modelDeployment: { include: { inferHost: true, contextBuilderProfile: true } },
       turns: { orderBy: { createdAt: "asc" } },
     },
   });
@@ -309,7 +375,7 @@ export async function createLiveSessionService(input: {
 
   const deployment = await input.db.modelDeployment.findUnique({
     where: { id: modelDeploymentId },
-    include: { inferHost: true },
+    include: { inferHost: true, contextBuilderProfile: true },
   });
 
   if (!deployment?.inferHost) {
@@ -317,19 +383,29 @@ export async function createLiveSessionService(input: {
   }
 
   const title = asString(body.title) || deployment.name + " live " + new Date().toISOString().slice(0, 19);
+  const scenario = asString(body.scenario) || null;
+  const seededMemoryState = seedPersonaMemoryState({ scenario });
   const session = await input.db.liveSession.create({
     data: {
       inferHostId: deployment.inferHostId,
       modelDeploymentId: deployment.id,
       title,
       status: "active",
-      scenario: asString(body.scenario) || null,
+      scenario,
       notes: asString(body.notes) || null,
+      summaryText: buildPersonaSummaryText(seededMemoryState),
+      memoryStateJson: JSON.stringify(seededMemoryState),
+      lastMemoryUpdatedAt:
+        seededMemoryState.profile.length > 0 ||
+        seededMemoryState.facts.length > 0 ||
+        seededMemoryState.openLoops.length > 0
+          ? new Date()
+          : null,
       transcriptJson: "[]",
     },
     include: {
       inferHost: true,
-      modelDeployment: true,
+      modelDeployment: { include: { inferHost: true, contextBuilderProfile: true } },
       turns: { orderBy: { createdAt: "asc" } },
     },
   });
@@ -354,13 +430,12 @@ export async function runLiveSessionChatService(input: {
     return jsonResult({ error: "content is required" }, 400);
   }
 
-  const prepared = prepareLiveSessionInference({
+  const { prepared, toolLoop } = buildPreparedLiveSessionInput({
     session: resolved.session,
     deployment: resolved.deployment,
     inferHost: resolved.inferHost,
-    turns: resolved.session.turns,
     content,
-    generation: parseRequestedGeneration(body),
+    body,
     source: "live_chat",
   });
 
@@ -401,6 +476,7 @@ export async function runLiveSessionChatService(input: {
       result,
       deployment: persisted.updatedDeployment,
       artifacts: prepared.artifacts,
+      toolLoop,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -445,13 +521,12 @@ export async function startLiveSessionStreamService(input: {
     return jsonResult({ error: "content is required" }, 400);
   }
 
-  const prepared = prepareLiveSessionInference({
+  const { prepared, toolLoop } = buildPreparedLiveSessionInput({
     session: liveSession,
     deployment,
     inferHost,
-    turns: liveSession.turns,
     content,
-    generation: parseRequestedGeneration(body),
+    body,
     source: "live_stream",
   });
   const remoteCommand = buildRemoteHttpCommand({
@@ -486,6 +561,7 @@ export async function startLiveSessionStreamService(input: {
         session: persisted.updatedSession,
         deployment: persisted.updatedDeployment,
         artifacts: prepared.artifacts,
+        toolLoop,
       } as Record<string, unknown>;
     };
 
