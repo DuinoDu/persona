@@ -1,0 +1,421 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Audio {
+  id           String   @id @default(cuid())
+  filename     String   @unique
+  filepath     String
+  date         String
+  startTime    String
+  endTime      String
+  personTag    String
+  lastPosition Float    @default(0)
+  createdAt    DateTime @default(now())
+}
+
+model Feedback {
+  id                  String    @id @default(cuid())
+  audioId             String?
+  audioFilename       String?
+  audioDate           String?
+  audioPersonTag      String?
+  audioStartTime      String?
+  audioEndTime        String?
+  subtitleFile        String
+  subtitleIndex       Int?
+  subtitleStart       Float?
+  subtitleEnd         Float?
+  subtitleText        String?
+  subtitleSourceKind  String?
+  subtitleSourcePath  String?
+  subtitleSourceIndex Int?
+  subtitleAbsStart    Float?
+  subtitleAbsEnd      Float?
+  message             String
+  processingStatus    String    @default("待处理")
+  processedAt         DateTime?
+  repairStatus        String    @default("pending")
+  repairSummary       String?
+  repairConfidence    Float?
+  repairedText        String?
+  repairPatchJson     String?
+  repairError         String?
+  repairedAt          DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @default(now()) @updatedAt
+
+  repairJobs FeedbackRepairJob[]
+}
+
+model FeedbackRepairJob {
+  id            String    @id @default(cuid())
+  feedbackId    String
+  status        String    @default("pending")
+  attempt       Int       @default(0)
+  model         String?
+  promptVersion String?
+  inputJson     String?
+  outputJson    String?
+  patchJson     String?
+  error         String?
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  feedback Feedback @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([feedbackId, createdAt])
+}
+
+model PromptVersion {
+  id              String            @id @default(cuid())
+  slug            String            @unique
+  title           String
+  body            String
+  sourceFile      String?
+  status          String            @default("active")
+  notes           String?
+  deployments     ModelDeployment[]
+  inferenceTraces InferenceTrace[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+model GenerationConfigProfile {
+  id              String            @id @default(cuid())
+  slug            String            @unique
+  title           String
+  configJson      String
+  status          String            @default("active")
+  notes           String?
+  deployments     ModelDeployment[]
+  inferenceTraces InferenceTrace[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+model ContextBuilderProfile {
+  id              String            @id @default(cuid())
+  slug            String            @unique
+  title           String
+  configJson      String
+  status          String            @default("active")
+  notes           String?
+  deployments     ModelDeployment[]
+  inferenceTraces InferenceTrace[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+model InferHost {
+  id              String            @id @default(cuid())
+  name            String            @unique
+  sshHost         String
+  sshPort         Int               @default(22)
+  sshUser         String
+  workspacePath   String
+  status          String            @default("active")
+  gpuPolicy       String            @default("shared_service")
+  notes           String?
+  deployments     ModelDeployment[]
+  evalRuns        EvalRun[]
+  liveSessions    LiveSession[]
+  inferenceTraces InferenceTrace[]
+  badCases        BadCase[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+model ModelDeployment {
+  id                        String                   @id @default(cuid())
+  inferHostId               String
+  promptVersionId           String?
+  generationConfigProfileId String?
+  contextBuilderProfileId   String?
+  name                      String
+  slug                      String                   @unique
+  baseModelPath             String
+  adapterPath               String?
+  systemPromptFile          String?
+  runnerKind                String                   @default("batch_chat_eval")
+  runnerScriptPath          String?
+  serviceMode               String                   @default("offline_only")
+  serviceStatus             String                   @default("stopped")
+  serviceBaseUrl            String?
+  serviceChatPath           String?
+  serviceStreamPath         String?
+  serviceSessionName        String?
+  serviceLogPath            String?
+  serviceStatusPath         String?
+  serviceLastExitCode       Int?
+  serviceLastError          String?
+  serviceLastHealthJson     String?
+  serviceLastCheckedAt      DateTime?
+  defaultDevice             String                   @default("cuda")
+  notes                     String?
+  inferHost                 InferHost                @relation(fields: [inferHostId], references: [id], onDelete: Cascade)
+  promptVersion             PromptVersion?           @relation(fields: [promptVersionId], references: [id], onDelete: SetNull)
+  generationConfigProfile   GenerationConfigProfile? @relation(fields: [generationConfigProfileId], references: [id], onDelete: SetNull)
+  contextBuilderProfile     ContextBuilderProfile?   @relation(fields: [contextBuilderProfileId], references: [id], onDelete: SetNull)
+  evalRuns                  EvalRun[]
+  liveSessions              LiveSession[]
+  inferenceTraces           InferenceTrace[]
+  badCases                  BadCase[]
+  createdAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @updatedAt
+
+  @@index([inferHostId, createdAt])
+  @@index([promptVersionId, createdAt])
+  @@index([generationConfigProfileId, createdAt])
+  @@index([contextBuilderProfileId, createdAt])
+}
+
+model EvalSuite {
+  id             String          @id @default(cuid())
+  slug           String          @unique
+  title          String
+  description    String?
+  sourcePath     String
+  caseCount      Int             @default(0)
+  tagsJson       String?
+  status         String          @default("active")
+  evalRuns       EvalRun[]
+  arenaJudgments ArenaJudgment[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model EvalRun {
+  id                    String           @id @default(cuid())
+  inferHostId           String?
+  modelDeploymentId     String?
+  evalSuiteId           String?
+  title                 String
+  mode                  String           @default("offline")
+  kind                  String           @default("suite_batch")
+  status                String           @default("draft")
+  outputDir             String?
+  logPath               String?
+  statusPath            String?
+  summaryPath           String?
+  tmuxSession           String?
+  remoteCommand         String?
+  configJson            String?
+  resultJson            String?
+  error                 String?
+  startedAt             DateTime?
+  finishedAt            DateTime?
+  inferHost             InferHost?       @relation(fields: [inferHostId], references: [id], onDelete: SetNull)
+  modelDeployment       ModelDeployment? @relation(fields: [modelDeploymentId], references: [id], onDelete: SetNull)
+  evalSuite             EvalSuite?       @relation(fields: [evalSuiteId], references: [id], onDelete: SetNull)
+  arenaJudgmentsAsLeft  ArenaJudgment[]  @relation("ArenaLeftRun")
+  arenaJudgmentsAsRight ArenaJudgment[]  @relation("ArenaRightRun")
+  inferenceTraces       InferenceTrace[]
+  badCases              BadCase[]
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  @@index([status, createdAt])
+  @@index([modelDeploymentId, createdAt])
+  @@index([inferHostId, createdAt])
+}
+
+model LiveSession {
+  id                String           @id @default(cuid())
+  inferHostId       String?
+  modelDeploymentId String?
+  title             String
+  status            String           @default("draft")
+  scenario          String?
+  notes             String?
+  summaryText       String?
+  transcriptJson    String?
+  inferHost         InferHost?       @relation(fields: [inferHostId], references: [id], onDelete: SetNull)
+  modelDeployment   ModelDeployment? @relation(fields: [modelDeploymentId], references: [id], onDelete: SetNull)
+  turns             LiveTurn[]
+  inferenceTraces   InferenceTrace[]
+  badCases          BadCase[]
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@index([status, createdAt])
+}
+
+model LiveTurn {
+  id              String           @id @default(cuid())
+  liveSessionId   String
+  role            String
+  content         String
+  latencyMs       Int?
+  tokenCount      Int?
+  rawJson         String?
+  liveSession     LiveSession      @relation(fields: [liveSessionId], references: [id], onDelete: Cascade)
+  inferenceTraces InferenceTrace[]
+  badCases        BadCase[]
+  createdAt       DateTime         @default(now())
+
+  @@index([liveSessionId, createdAt])
+}
+
+model ArenaJudgment {
+  id                 String     @id @default(cuid())
+  evalSuiteId        String?
+  leftEvalRunId      String
+  rightEvalRunId     String
+  caseId             String
+  caseSlice          String?
+  promptPreview      String?
+  winner             String     @default("skip")
+  winnerEvalRunId    String?
+  personaScore       Int?
+  judgmentScore      Int?
+  premiseScore       Int?
+  structureScore     Int?
+  actionabilityScore Int?
+  naturalnessScore   Int?
+  stabilityScore     Int?
+  failureTagsJson    String?
+  notes              String?
+  evalSuite          EvalSuite? @relation(fields: [evalSuiteId], references: [id], onDelete: SetNull)
+  leftEvalRun        EvalRun    @relation("ArenaLeftRun", fields: [leftEvalRunId], references: [id], onDelete: Cascade)
+  rightEvalRun       EvalRun    @relation("ArenaRightRun", fields: [rightEvalRunId], references: [id], onDelete: Cascade)
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  @@unique([leftEvalRunId, rightEvalRunId, caseId])
+  @@index([evalSuiteId, createdAt])
+  @@index([winnerEvalRunId, createdAt])
+}
+
+model InferenceTrace {
+  id                        String                   @id @default(cuid())
+  sourceType                String
+  sourceId                  String?
+  inferHostId               String?
+  modelDeploymentId         String?
+  evalRunId                 String?
+  liveSessionId             String?
+  liveTurnId                String?
+  promptVersionId           String?
+  generationConfigProfileId String?
+  contextBuilderProfileId   String?
+  caseId                    String?
+  status                    String                   @default("succeeded")
+  runtimeSignatureJson      String
+  finalMessagesJson         String
+  generationConfigJson      String
+  traceMetaJson             String?
+  summarySnapshotJson       String?
+  trimReportJson            String?
+  estimatedPromptTokens     Int?
+  generatedTokens           Int?
+  readyWaitMs               Int?
+  firstTokenLatencyMs       Int?
+  totalLatencyMs            Int?
+  outputText                String?
+  rawOutputJson             String?
+  remoteLogPath             String?
+  remoteArtifactPath        String?
+  error                     String?
+  inferHost                 InferHost?               @relation(fields: [inferHostId], references: [id], onDelete: SetNull)
+  modelDeployment           ModelDeployment?         @relation(fields: [modelDeploymentId], references: [id], onDelete: SetNull)
+  evalRun                   EvalRun?                 @relation(fields: [evalRunId], references: [id], onDelete: SetNull)
+  liveSession               LiveSession?             @relation(fields: [liveSessionId], references: [id], onDelete: SetNull)
+  liveTurn                  LiveTurn?                @relation(fields: [liveTurnId], references: [id], onDelete: SetNull)
+  promptVersion             PromptVersion?           @relation(fields: [promptVersionId], references: [id], onDelete: SetNull)
+  generationConfigProfile   GenerationConfigProfile? @relation(fields: [generationConfigProfileId], references: [id], onDelete: SetNull)
+  contextBuilderProfile     ContextBuilderProfile?   @relation(fields: [contextBuilderProfileId], references: [id], onDelete: SetNull)
+  badCases                  BadCase[]
+  createdAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @updatedAt
+
+  @@index([sourceType, sourceId, createdAt])
+  @@index([modelDeploymentId, createdAt])
+  @@index([evalRunId, createdAt])
+  @@index([liveSessionId, createdAt])
+  @@index([liveTurnId, createdAt])
+  @@index([status, createdAt])
+}
+
+model BadCase {
+  id                String               @id @default(cuid())
+  sourceType        String
+  sourceId          String?
+  inferHostId       String?
+  modelDeploymentId String?
+  evalRunId         String?
+  liveSessionId     String?
+  liveTurnId        String?
+  inferenceTraceId  String?
+  caseId            String?
+  title             String?
+  status            String               @default("open")
+  severity          String               @default("medium")
+  failureTagsJson   String?
+  rubricScoresJson  String?
+  editedTargetText  String?
+  chosenText        String?
+  rejectedText      String?
+  notes             String?
+  inferHost         InferHost?           @relation(fields: [inferHostId], references: [id], onDelete: SetNull)
+  modelDeployment   ModelDeployment?     @relation(fields: [modelDeploymentId], references: [id], onDelete: SetNull)
+  evalRun           EvalRun?             @relation(fields: [evalRunId], references: [id], onDelete: SetNull)
+  liveSession       LiveSession?         @relation(fields: [liveSessionId], references: [id], onDelete: SetNull)
+  liveTurn          LiveTurn?            @relation(fields: [liveTurnId], references: [id], onDelete: SetNull)
+  inferenceTrace    InferenceTrace?      @relation(fields: [inferenceTraceId], references: [id], onDelete: SetNull)
+  exportItems       TrainingExportItem[]
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  @@index([sourceType, sourceId, createdAt])
+  @@index([modelDeploymentId, createdAt])
+  @@index([evalRunId, createdAt])
+  @@index([liveSessionId, createdAt])
+  @@index([liveTurnId, createdAt])
+  @@index([status, createdAt])
+}
+
+model TrainingExport {
+  id          String               @id @default(cuid())
+  kind        String
+  status      String               @default("draft")
+  title       String
+  outputPath  String?
+  itemCount   Int                  @default(0)
+  configJson  String?
+  summaryJson String?
+  error       String?
+  items       TrainingExportItem[]
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@index([kind, createdAt])
+  @@index([status, createdAt])
+}
+
+model TrainingExportItem {
+  id               String         @id @default(cuid())
+  trainingExportId String
+  badCaseId        String?
+  sourceType       String
+  sourceId         String?
+  payloadJson      String
+  trainingExport   TrainingExport @relation(fields: [trainingExportId], references: [id], onDelete: Cascade)
+  badCase          BadCase?       @relation(fields: [badCaseId], references: [id], onDelete: SetNull)
+  createdAt        DateTime       @default(now())
+
+  @@index([trainingExportId, createdAt])
+  @@index([badCaseId, createdAt])
+  @@index([sourceType, sourceId, createdAt])
+}

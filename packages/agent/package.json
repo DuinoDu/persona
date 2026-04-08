@@ -1,0 +1,50 @@
+{
+  "name": "@ququ/agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./personaRuntime": {
+      "types": "./src/personaRuntime.ts",
+      "default": "./src/personaRuntime.ts"
+    },
+    "./personaContextBuilder": {
+      "types": "./src/personaContextBuilder.ts",
+      "default": "./src/personaContextBuilder.ts"
+    },
+    "./personaArtifacts": {
+      "types": "./src/personaArtifacts.ts",
+      "default": "./src/personaArtifacts.ts"
+    },
+    "./evalArtifacts": {
+      "types": "./src/evalArtifacts.ts",
+      "default": "./src/evalArtifacts.ts"
+    },
+    "./remoteJobs": {
+      "types": "./src/remoteJobs.ts",
+      "default": "./src/remoteJobs.ts"
+    },
+    "./inferenceTrace": {
+      "types": "./src/inferenceTrace.ts",
+      "default": "./src/inferenceTrace.ts"
+    },
+    "./personaExport": {
+      "types": "./src/personaExport.ts",
+      "default": "./src/personaExport.ts"
+    },
+    "./liveSessionRuntime": {
+      "types": "./src/liveSessionRuntime.ts",
+      "default": "./src/liveSessionRuntime.ts"
+    },
+    "./remoteSse": {
+      "types": "./src/remoteSse.ts",
+      "default": "./src/remoteSse.ts"
+    },
+    "./package.json": "./package.json"
+  }
+}

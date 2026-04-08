@@ -7,6 +7,9 @@ YouTube 频道 @QuQuUP 直播内容处理流水线：从视频下载到对话语
 ```
 .
 ├── Makefile                    # 流水线入口，make help 查看命令
+├── packages/
+│   ├── player/                 # Web frontend / admin console
+│   └── agent/                  # Persona harness / LLM runner / H20 orchestration
 ├── scripts/                    # 流水线脚本（按步骤编号）
 │   ├── 01_download_audio.sh    # Step 1: YouTube 播放列表下载 MP3
 │   ├── 02_split_audio.py       # Step 2: 长音频按 2 小时分割
@@ -14,7 +17,8 @@ YouTube 频道 @QuQuUP 直播内容处理流水线：从视频下载到对话语
 │   ├── 03_split_transcribe_merge.py  # Step 3 辅助: 单文件分片转写+合并
 │   ├── 04_merge_transcripts.py # Step 4: 合并 part JSON 按日期
 │   ├── 05_extract_conversations.py # Step 5: 提取观众连麦对话
-│   └── serve_mp3.sh            # 工具: HTTP + Cloudflare Tunnel 服务
+│   ├── serve_mp3.sh            # 工具: HTTP + Cloudflare Tunnel 服务
+│   └── evals/                  # 兼容入口；真实实现已迁到 packages/agent/scripts/evals
 ├── speech2text/                # 本地语音转文字引擎 (Whisper + pyannote)
 ├── data/                       # 数据目录（git 忽略）
 │   ├── 01_downloads/           # 原始 MP3 下载
@@ -70,6 +74,13 @@ make step5-extract      # 提取对话
 - **音频处理**: ffmpeg / ffprobe
 - **语音识别**: Whisper (faster-whisper) + pyannote (说话人分离)
 - **网络穿透**: Cloudflare Tunnel
+
+## Package 边界
+
+- `packages/player`: 前端、后台控制台、API routes、Prisma schema
+- `packages/agent`: persona harness、LLM runner、H20 orchestration、trace/export domain logic
+
+Web 控制面与管理后台位于 `packages/player/`；persona harness、评测编排与 H20 orchestration 位于 `packages/agent/`。
 
 ## 输出格式
 
