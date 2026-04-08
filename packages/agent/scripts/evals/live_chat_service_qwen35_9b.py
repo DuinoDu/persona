@@ -50,6 +50,7 @@ MODEL_BUNDLE = {
     "model": None,
     "generate_lock": threading.Lock(),
     "default_system_prompt": "",
+    "kv_cache_enabled": False,
 }
 REQUEST_STATE = {
     "counter": 0,
@@ -231,12 +232,13 @@ def build_model(base_model_path: str, adapter_path: str, system_prompt_file: str
     if device == "cpu":
         model.to("cpu")
     model.eval()
+    kv_cache_enabled = os.getenv("PERSONA_ENABLE_INCREMENTAL_CACHE", "0") == "1"
     if hasattr(model, "config"):
-        model.config.use_cache = True
+        model.config.use_cache = kv_cache_enabled
     default_system_prompt = ""
     if system_prompt_file:
         default_system_prompt = Path(system_prompt_file).read_text(encoding="utf-8")
-    return tokenizer, model, default_system_prompt
+    return tokenizer, model, default_system_prompt, kv_cache_enabled
 
 
 def normalize_messages(payload_messages, default_system_prompt: str):
@@ -302,30 +304,44 @@ def generate_tokens(model, inputs: dict, max_new_tokens: int, eos_token_id, do_s
     started = time.time()
     autocast_dtype = next(model.parameters()).dtype
     use_autocast = input_ids.device.type == "cuda" and autocast_dtype in {torch.float16, torch.bfloat16}
+    incremental_cache_enabled = MODEL_BUNDLE.get("kv_cache_enabled", False)
     step_input_ids = input_ids
     past_key_values = None
 
     for _ in range(max_new_tokens):
         with torch.no_grad():
-            model_kwargs = dict(
-                input_ids=step_input_ids,
-                attention_mask=attention_mask,
-                use_cache=True,
-                logits_to_keep=0,
-                return_dict=True,
-            )
-            if past_key_values is not None:
-                model_kwargs["past_key_values"] = past_key_values
+            if incremental_cache_enabled:
+                model_kwargs = dict(
+                    input_ids=step_input_ids,
+                    attention_mask=attention_mask,
+                    use_cache=True,
+                    logits_to_keep=0,
+                    return_dict=True,
+                )
+                if past_key_values is not None:
+                    model_kwargs["past_key_values"] = past_key_values
+            else:
+                model_kwargs = dict(
+                    input_ids=input_ids,
+                    attention_mask=attention_mask,
+                    use_cache=False,
+                    logits_to_keep=0,
+                    return_dict=True,
+                )
             if use_autocast:
                 with torch.autocast(device_type="cuda", dtype=autocast_dtype):
                     outputs = model(**model_kwargs)
             else:
                 outputs = model(**model_kwargs)
-        past_key_values = outputs.past_key_values
+        if incremental_cache_enabled:
+            past_key_values = outputs.past_key_values
         next_token_logits = outputs.logits[:, -1, :]
         next_token = pick_next_token(next_token_logits, do_sample=do_sample, temperature=temperature, top_p=top_p)
         generated.append(next_token)
-        step_input_ids = next_token
+        if incremental_cache_enabled:
+            step_input_ids = next_token
+        else:
+            input_ids = torch.cat([input_ids, next_token], dim=-1)
         attention_mask = torch.cat(
             [
                 attention_mask,
@@ -462,27 +478,38 @@ def stream_response_events(payload: dict, route_name: str = "chat"):
     started = time.time()
     autocast_dtype = next(model.parameters()).dtype
     use_autocast = input_ids.device.type == "cuda" and autocast_dtype in {torch.float16, torch.bfloat16}
+    incremental_cache_enabled = MODEL_BUNDLE.get("kv_cache_enabled", False)
     step_input_ids = input_ids
     past_key_values = None
 
     with MODEL_BUNDLE["generate_lock"]:
         for _ in range(max_new_tokens):
             with torch.no_grad():
-                model_kwargs = dict(
-                    input_ids=step_input_ids,
-                    attention_mask=attention_mask,
-                    use_cache=True,
-                    logits_to_keep=0,
-                    return_dict=True,
-                )
-                if past_key_values is not None:
-                    model_kwargs["past_key_values"] = past_key_values
+                if incremental_cache_enabled:
+                    model_kwargs = dict(
+                        input_ids=step_input_ids,
+                        attention_mask=attention_mask,
+                        use_cache=True,
+                        logits_to_keep=0,
+                        return_dict=True,
+                    )
+                    if past_key_values is not None:
+                        model_kwargs["past_key_values"] = past_key_values
+                else:
+                    model_kwargs = dict(
+                        input_ids=input_ids,
+                        attention_mask=attention_mask,
+                        use_cache=False,
+                        logits_to_keep=0,
+                        return_dict=True,
+                    )
                 if use_autocast:
                     with torch.autocast(device_type="cuda", dtype=autocast_dtype):
                         outputs = model(**model_kwargs)
                 else:
                     outputs = model(**model_kwargs)
-            past_key_values = outputs.past_key_values
+            if incremental_cache_enabled:
+                past_key_values = outputs.past_key_values
             next_token_logits = outputs.logits[:, -1, :]
             next_token = pick_next_token(
                 next_token_logits,
@@ -500,7 +527,10 @@ def stream_response_events(payload: dict, route_name: str = "chat"):
                 delta = next_clean_text
             clean_output_text = next_clean_text
 
-            step_input_ids = next_token
+            if incremental_cache_enabled:
+                step_input_ids = next_token
+            else:
+                input_ids = torch.cat([input_ids, next_token], dim=-1)
             attention_mask = torch.cat(
                 [
                     attention_mask,
@@ -646,7 +676,7 @@ class Handler(BaseHTTPRequestHandler):
                 "generation_config_version": SERVICE_STATE["generation_config_version"],
                 "context_builder_version": SERVICE_STATE["context_builder_version"],
                 "default_max_new_tokens": SERVICE_STATE["default_max_new_tokens"],
-                "kv_cache_enabled": True,
+                "kv_cache_enabled": MODEL_BUNDLE.get("kv_cache_enabled", False),
                 "trace_dir": SERVICE_STATE["trace_dir"],
                 "uptime_sec": int(time.time() - SERVICE_STATE["started_at"]),
             }
@@ -739,7 +769,7 @@ def main():
     )
 
     try:
-        tokenizer, model, default_system_prompt = build_model(
+        tokenizer, model, default_system_prompt, kv_cache_enabled = build_model(
             args.base_model_path,
             args.adapter_path,
             args.system_prompt_file,
@@ -748,6 +778,7 @@ def main():
         MODEL_BUNDLE["tokenizer"] = tokenizer
         MODEL_BUNDLE["model"] = model
         MODEL_BUNDLE["default_system_prompt"] = default_system_prompt
+        MODEL_BUNDLE["kv_cache_enabled"] = kv_cache_enabled
         SERVICE_STATE["ready"] = True
         SERVICE_STATE["loading"] = False
         print(

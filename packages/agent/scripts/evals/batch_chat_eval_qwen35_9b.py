@@ -241,9 +241,10 @@ def build_model(base_model_path: str, adapter_path: str, device: str):
     if device == "cpu":
         model.to("cpu")
     model.eval()
+    kv_cache_enabled = os.getenv("PERSONA_ENABLE_INCREMENTAL_CACHE", "0") == "1"
     if hasattr(model, "config"):
-        model.config.use_cache = True
-    return tokenizer, model
+        model.config.use_cache = kv_cache_enabled
+    return tokenizer, model, kv_cache_enabled
 
 
 def pick_next_token(next_token_logits: torch.Tensor, do_sample: bool, temperature: float, top_p: float) -> torch.Tensor:
@@ -289,30 +290,44 @@ def generate_tokens(model, inputs: dict, max_new_tokens: int, eos_token_id, do_s
     started = time.time()
     autocast_dtype = next(model.parameters()).dtype
     use_autocast = input_ids.device.type == "cuda" and autocast_dtype in {torch.float16, torch.bfloat16}
+    incremental_cache_enabled = os.getenv("PERSONA_ENABLE_INCREMENTAL_CACHE", "0") == "1"
     step_input_ids = input_ids
     past_key_values = None
 
     for _ in range(max_new_tokens):
         with torch.no_grad():
-            model_kwargs = dict(
-                input_ids=step_input_ids,
-                attention_mask=attention_mask,
-                use_cache=True,
-                logits_to_keep=0,
-                return_dict=True,
-            )
-            if past_key_values is not None:
-                model_kwargs["past_key_values"] = past_key_values
+            if incremental_cache_enabled:
+                model_kwargs = dict(
+                    input_ids=step_input_ids,
+                    attention_mask=attention_mask,
+                    use_cache=True,
+                    logits_to_keep=0,
+                    return_dict=True,
+                )
+                if past_key_values is not None:
+                    model_kwargs["past_key_values"] = past_key_values
+            else:
+                model_kwargs = dict(
+                    input_ids=input_ids,
+                    attention_mask=attention_mask,
+                    use_cache=False,
+                    logits_to_keep=0,
+                    return_dict=True,
+                )
             if use_autocast:
                 with torch.autocast(device_type="cuda", dtype=autocast_dtype):
                     outputs = model(**model_kwargs)
             else:
                 outputs = model(**model_kwargs)
-        past_key_values = outputs.past_key_values
+        if incremental_cache_enabled:
+            past_key_values = outputs.past_key_values
         next_token_logits = outputs.logits[:, -1, :]
         next_token = pick_next_token(next_token_logits, do_sample=do_sample, temperature=temperature, top_p=top_p)
         generated.append(next_token)
-        step_input_ids = next_token
+        if incremental_cache_enabled:
+            step_input_ids = next_token
+        else:
+            input_ids = torch.cat([input_ids, next_token], dim=-1)
         attention_mask = torch.cat(
             [
                 attention_mask,
@@ -364,7 +379,7 @@ def main():
     suite, suite_meta = load_suite(suite_path)
     print(f"suite_cases={len(suite)} path={suite_path}", flush=True)
     print(f"stage=load_model base={args.base_model_path} adapter={args.adapter_path or '-'} device={args.device}", flush=True)
-    tokenizer, model = build_model(args.base_model_path, args.adapter_path, args.device)
+    tokenizer, model, kv_cache_enabled = build_model(args.base_model_path, args.adapter_path, args.device)
     target_device = next(model.parameters()).device
     runtime_signature = build_runtime_signature(
         deployment_id=args.deployment_id,
@@ -518,6 +533,7 @@ def main():
         "adapter_path": args.adapter_path,
         "system_prompt_file": args.system_prompt_file,
         "device": args.device,
+        "kv_cache_enabled": kv_cache_enabled,
         "runtime_signature": runtime_signature,
         "generation_config": generation_config,
         "do_sample": args.do_sample,
