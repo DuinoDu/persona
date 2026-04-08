@@ -131,6 +131,10 @@ export function buildPersonaContext(input: BuildPersonaContextInput): BuildPerso
         }))
         .filter((message) => message.content.length > 0)
     : [];
+  const extraSystemContents = extraMessages
+    .filter((message) => message.role === "system")
+    .map((message) => message.content);
+  const extraConversationMessages = extraMessages.filter((message) => message.role !== "system");
   const maxInputTokens = input.maxInputTokens ?? null;
   const reserveOutputTokens = input.reserveOutputTokens ?? null;
   const maxRecentTurns = input.maxRecentTurns ?? null;
@@ -146,12 +150,6 @@ export function buildPersonaContext(input: BuildPersonaContextInput): BuildPerso
   const windowedStableTurns =
     maxRecentTurns !== null && maxRecentTurns >= 0 ? stableTurns.slice(-maxRecentTurns) : stableTurns.slice();
 
-  const systemMessage: PersonaMessage[] = systemPrompt
-    ? [{ role: "system", content: systemPrompt }]
-    : [];
-  const summaryMessage: PersonaMessage[] = summary
-    ? [{ role: "system", content: `Conversation summary:\n${summary}` }]
-    : [];
   const historyMessages: PersonaMessage[] = windowedStableTurns.map((turn) => ({
     role: turn.role,
     content: turn.content,
@@ -160,7 +158,16 @@ export function buildPersonaContext(input: BuildPersonaContextInput): BuildPerso
     historyMessages.push({ role: "user", content: nextUserMessage });
   }
 
-  const initialMessages = systemMessage.concat(extraMessages, summaryMessage, historyMessages);
+  const buildLeadingSystemMessage = (summaryContent: string): PersonaMessage[] => {
+    const systemContents = [
+      systemPrompt,
+      ...extraSystemContents,
+      summaryContent ? `Conversation summary:\n${summaryContent}` : "",
+    ].filter((content) => content.length > 0);
+    return systemContents.length > 0 ? [{ role: "system", content: systemContents.join("\n\n") }] : [];
+  };
+
+  const initialMessages = buildLeadingSystemMessage(summary).concat(extraConversationMessages, historyMessages);
   const initialEstimatedPromptTokens = estimateTokenCount(initialMessages);
 
   let trimmedForBudget = false;
@@ -168,14 +175,13 @@ export function buildPersonaContext(input: BuildPersonaContextInput): BuildPerso
   let droppedSummary = false;
   const droppedStableTurnIds: string[] = [];
 
-  let activeSummaryMessage = summaryMessage;
+  let activeSummary = summary;
   const activeStableTurns = windowedStableTurns.slice();
   const userMessage = nextUserMessage.length > 0 ? historyMessages[historyMessages.length - 1] : null;
 
   const buildMessages = () =>
-    systemMessage.concat(
-      extraMessages,
-      activeSummaryMessage,
+    buildLeadingSystemMessage(activeSummary).concat(
+      extraConversationMessages,
       activeStableTurns.map((turn) => ({
         role: turn.role,
         content: turn.content,
@@ -198,8 +204,8 @@ export function buildPersonaContext(input: BuildPersonaContextInput): BuildPerso
       finalEstimatedPromptTokens = estimateTokenCount(finalMessages);
     }
 
-    if (finalEstimatedPromptTokens > allowedPromptTokens && activeSummaryMessage.length > 0) {
-      activeSummaryMessage = [];
+    if (finalEstimatedPromptTokens > allowedPromptTokens && activeSummary.length > 0) {
+      activeSummary = "";
       droppedSummary = true;
       finalMessages = buildMessages();
       finalEstimatedPromptTokens = estimateTokenCount(finalMessages);
@@ -224,8 +230,9 @@ export function buildPersonaContext(input: BuildPersonaContextInput): BuildPerso
       droppedWindowTurnIds,
       droppedSummary,
       extraMessageCount: extraMessages.length,
-      systemPromptIncluded: systemMessage.length > 0,
-      summaryIncluded: activeSummaryMessage.length > 0,
+      systemPromptIncluded:
+        systemPrompt.length > 0 || extraSystemContents.length > 0 || activeSummary.length > 0,
+      summaryIncluded: activeSummary.length > 0,
       maxInputTokens,
       reserveOutputTokens,
       maxRecentTurns,
