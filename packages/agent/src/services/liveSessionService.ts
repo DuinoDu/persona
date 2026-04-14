@@ -23,6 +23,13 @@ import {
 } from "@ququ/agent/remoteJobs";
 import { streamRemoteSseOverSsh } from "@ququ/agent/remoteSse";
 import {
+  buildVllmDonePayload,
+  defaultServicePathsForRunner,
+  isVllmOpenAiRunner,
+  normalizeServiceChatResult,
+  parseVllmStreamPayload,
+} from "@ququ/agent/serviceProtocol";
+import {
   asString,
   type AgentDbClient,
   jsonResult,
@@ -204,13 +211,14 @@ async function persistLiveSessionSuccess(input: {
       updatedAt: createdAssistantTurn.createdAt,
     });
     const nextSummaryText = buildPersonaSummaryText(nextMemoryState);
+    const servicePaths = defaultServicePathsForRunner(input.deployment.runnerKind);
 
     const deploymentData = input.streaming
       ? {
           serviceStatus: "running_service",
           serviceBaseUrl: input.prepared.artifacts.baseUrl,
-          serviceChatPath: "/chat",
-          serviceStreamPath: "/stream",
+          serviceChatPath: input.deployment.serviceChatPath || servicePaths.chatPath,
+          serviceStreamPath: input.deployment.serviceStreamPath || servicePaths.streamPath,
           serviceSessionName: input.prepared.artifacts.sessionName,
           serviceLogPath: input.prepared.artifacts.logPath,
           serviceStatusPath: input.prepared.artifacts.statusPath,
@@ -222,7 +230,8 @@ async function persistLiveSessionSuccess(input: {
       : {
           serviceStatus: "running_service",
           serviceBaseUrl: input.prepared.artifacts.baseUrl,
-          serviceChatPath: "/chat",
+          serviceChatPath: input.deployment.serviceChatPath || servicePaths.chatPath,
+          serviceStreamPath: input.deployment.serviceStreamPath || servicePaths.streamPath,
           serviceSessionName: input.prepared.artifacts.sessionName,
           serviceLogPath: input.prepared.artifacts.logPath,
           serviceStatusPath: input.prepared.artifacts.statusPath,
@@ -283,12 +292,13 @@ async function persistLiveSessionError(input: {
   }).catch(() => null);
 
   const sessionNote = input.streaming ? "live_stream_error=" : "live_chat_error=";
+  const servicePaths = defaultServicePathsForRunner(input.deployment.runnerKind);
   const deploymentData = input.streaming
     ? {
         serviceStatus: probe ? nextLiveServiceStatus(probe) : "failed",
         serviceBaseUrl: input.prepared.artifacts.baseUrl,
-        serviceChatPath: "/chat",
-        serviceStreamPath: "/stream",
+        serviceChatPath: input.deployment.serviceChatPath || servicePaths.chatPath,
+        serviceStreamPath: input.deployment.serviceStreamPath || servicePaths.streamPath,
         serviceSessionName: input.prepared.artifacts.sessionName,
         serviceLogPath: input.prepared.artifacts.logPath,
         serviceStatusPath: input.prepared.artifacts.statusPath,
@@ -306,7 +316,8 @@ async function persistLiveSessionError(input: {
     : {
         serviceStatus: probe ? nextLiveServiceStatus(probe) : "failed",
         serviceBaseUrl: input.prepared.artifacts.baseUrl,
-        serviceChatPath: "/chat",
+        serviceChatPath: input.deployment.serviceChatPath || servicePaths.chatPath,
+        serviceStreamPath: input.deployment.serviceStreamPath || servicePaths.streamPath,
         serviceSessionName: input.prepared.artifacts.sessionName,
         serviceLogPath: input.prepared.artifacts.logPath,
         serviceStatusPath: input.prepared.artifacts.statusPath,
@@ -448,23 +459,27 @@ export async function runLiveSessionChatService(input: {
       baseUrl: prepared.artifacts.baseUrl,
     });
 
-    const result = await remoteHttpJson({
+    const startedAt = Date.now();
+    const rawResult = await remoteHttpJson({
       host: prepared.hostConfig,
       url: prepared.chatUrl,
       method: "POST",
       body: prepared.inferenceBody,
     });
+    const normalized = normalizeServiceChatResult({
+      runnerKind: resolved.deployment.runnerKind,
+      response: rawResult,
+      latencyMs: Date.now() - startedAt,
+    });
 
-    const payload = typeof result === "object" && result !== null ? (result as Record<string, unknown>) : {};
-    const outputText = readTrimmedString(payload.output_text) || readTrimmedString(payload.raw_output_text);
     const persisted = await persistLiveSessionSuccess({
       db: input.db,
       session: resolved.session,
       deployment: resolved.deployment,
       inferHost: resolved.inferHost,
       prepared,
-      result,
-      outputText,
+      result: normalized.result,
+      outputText: normalized.outputText,
       streaming: false,
     });
 
@@ -473,7 +488,7 @@ export async function runLiveSessionChatService(input: {
       userTurn: persisted.userTurn,
       assistantTurn: persisted.assistantTurn,
       inferenceTrace: persisted.inferenceTrace,
-      result,
+      result: normalized.result,
       deployment: persisted.updatedDeployment,
       artifacts: prepared.artifacts,
       toolLoop,
@@ -532,13 +547,16 @@ export async function startLiveSessionStreamService(input: {
   const remoteCommand = buildRemoteHttpCommand({
     url: prepared.streamUrl,
     method: "POST",
-    body: prepared.inferenceBody,
+    body: prepared.streamInferenceBody,
     noBuffer: true,
   });
 
   async function* eventStream() {
     let stderrBuffer = "";
     let streamedAssistantText = "";
+    let promptTokens: number | null = null;
+    let completionTokens: number | null = null;
+    const streamStartedAt = Date.now();
 
     const finalizeSuccess = async (payloadValue: Record<string, unknown>) => {
       const outputText = readTrimmedString(payloadValue.output_text) || streamedAssistantText;
@@ -611,6 +629,38 @@ export async function startLiveSessionStreamService(input: {
           continue;
         }
         if (event.kind === "payload") {
+          if (isVllmOpenAiRunner(deployment.runnerKind)) {
+            const parsed = parseVllmStreamPayload(event.payload);
+            if (parsed.promptTokens !== null) {
+              promptTokens = parsed.promptTokens;
+            }
+            if (parsed.completionTokens !== null) {
+              completionTokens = parsed.completionTokens;
+            }
+            if (parsed.errorText) {
+              stderrBuffer = [stderrBuffer, parsed.errorText].filter(Boolean).join("\n");
+              yield { type: "error", error: parsed.errorText };
+              continue;
+            }
+            if (parsed.deltaText.length > 0) {
+              streamedAssistantText += parsed.deltaText;
+              yield { type: "chunk", delta: parsed.deltaText };
+              continue;
+            }
+            if (parsed.done) {
+              const donePayload = buildVllmDonePayload({
+                outputText: streamedAssistantText,
+                latencyMs: Date.now() - streamStartedAt,
+                promptTokens,
+                completionTokens,
+              });
+              yield donePayload;
+              yield await finalizeSuccess(donePayload);
+              return;
+            }
+            continue;
+          }
+
           const type = readTrimmedString(event.payload.type);
           if (type === "chunk") {
             streamedAssistantText += readTrimmedString(event.payload.delta);
@@ -638,19 +688,20 @@ export async function startLiveSessionStreamService(input: {
       if (baseMessage.includes("404")) {
         try {
           yield { type: "meta", mode: "chat_fallback", reason: "stream_endpoint_unavailable" };
+          const startedAt = Date.now();
           const chatPayload = await remoteHttpJson({
             host: prepared.hostConfig,
             url: prepared.chatUrl,
             method: "POST",
             body: prepared.inferenceBody,
           });
-          const finalPayload =
-            typeof chatPayload === "object" && chatPayload !== null
-              ? (chatPayload as Record<string, unknown>)
-              : {};
-          streamedAssistantText =
-            readTrimmedString(finalPayload.output_text) ||
-            readTrimmedString(finalPayload.raw_output_text);
+          const normalized = normalizeServiceChatResult({
+            runnerKind: deployment.runnerKind,
+            response: chatPayload,
+            latencyMs: Date.now() - startedAt,
+          });
+          const finalPayload = normalized.result;
+          streamedAssistantText = normalized.outputText;
           const donePayload = {
             type: "done",
             ...finalPayload,

@@ -45,6 +45,10 @@
       "types": "./src/remoteSse.ts",
       "default": "./src/remoteSse.ts"
     },
+    "./serviceProtocol": {
+      "types": "./src/serviceProtocol.ts",
+      "default": "./src/serviceProtocol.ts"
+    },
     "./package.json": "./package.json"
   }
 }

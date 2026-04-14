@@ -7,6 +7,7 @@ import {
   stopLiveService,
   summarizeLiveServiceError,
 } from "@ququ/agent/remoteJobs";
+import { defaultServicePathsForRunner } from "@ququ/agent/serviceProtocol";
 import {
   asBoolean,
   asNumber,
@@ -63,6 +64,7 @@ export async function startModelDeploymentService(input: {
     ? deployment.systemPromptFile.split("/").pop()?.replace(/\.[^.]+$/, "") || "default"
     : "default";
   const artifacts = buildLiveServiceArtifacts(deployment.inferHost.workspacePath, deployment.slug, port);
+  const servicePaths = defaultServicePathsForRunner(deployment.runnerKind);
   const hostConfig = buildHostConfig(deployment.inferHost);
 
   let probe = null;
@@ -81,8 +83,8 @@ export async function startModelDeploymentService(input: {
       data: {
         serviceStatus: probedStatus,
         serviceBaseUrl: artifacts.baseUrl,
-        serviceChatPath: "/chat",
-        serviceStreamPath: "/stream",
+        serviceChatPath: deployment.serviceChatPath || servicePaths.chatPath,
+        serviceStreamPath: deployment.serviceStreamPath || servicePaths.streamPath,
         serviceSessionName: artifacts.sessionName,
         serviceLogPath: artifacts.logPath,
         serviceStatusPath: artifacts.statusPath,
@@ -116,8 +118,8 @@ export async function startModelDeploymentService(input: {
       data: {
         serviceStatus: "starting",
         serviceBaseUrl: artifacts.baseUrl,
-        serviceChatPath: "/chat",
-        serviceStreamPath: "/stream",
+        serviceChatPath: deployment.serviceChatPath || servicePaths.chatPath,
+        serviceStreamPath: deployment.serviceStreamPath || servicePaths.streamPath,
         serviceSessionName: artifacts.sessionName,
         serviceLogPath: artifacts.logPath,
         serviceStatusPath: artifacts.statusPath,
@@ -148,6 +150,7 @@ export async function startModelDeploymentService(input: {
         adapterPath: deployment.adapterPath,
         systemPromptFile: deployment.systemPromptFile,
         runnerScriptPath: deployment.runnerScriptPath,
+        runnerKind: deployment.runnerKind,
         defaultDevice: deployment.defaultDevice,
         slug: deployment.slug,
         deploymentId: deployment.id,
@@ -169,8 +172,8 @@ export async function startModelDeploymentService(input: {
       data: {
         serviceStatus: "starting",
         serviceBaseUrl: launch.baseUrl,
-        serviceChatPath: "/chat",
-        serviceStreamPath: "/stream",
+        serviceChatPath: deployment.serviceChatPath || servicePaths.chatPath,
+        serviceStreamPath: deployment.serviceStreamPath || servicePaths.streamPath,
         serviceSessionName: launch.sessionName,
         serviceLogPath: launch.logPath,
         serviceStatusPath: launch.statusPath,
@@ -190,8 +193,8 @@ export async function startModelDeploymentService(input: {
       data: {
         serviceStatus: "failed_launch",
         serviceBaseUrl: artifacts.baseUrl,
-        serviceChatPath: "/chat",
-        serviceStreamPath: "/stream",
+        serviceChatPath: deployment.serviceChatPath || servicePaths.chatPath,
+        serviceStreamPath: deployment.serviceStreamPath || servicePaths.streamPath,
         serviceSessionName: artifacts.sessionName,
         serviceLogPath: artifacts.logPath,
         serviceStatusPath: artifacts.statusPath,
@@ -217,6 +220,7 @@ export async function checkModelDeploymentHealthService(input: {
 
   const port = resolvePort(deployment.serviceBaseUrl, deployment.slug);
   const artifacts = buildLiveServiceArtifacts(deployment.inferHost.workspacePath, deployment.slug, port);
+  const servicePaths = defaultServicePathsForRunner(deployment.runnerKind);
 
   try {
     const probe = await probeLiveService({
@@ -232,8 +236,8 @@ export async function checkModelDeploymentHealthService(input: {
       data: {
         serviceStatus: nextLiveServiceStatus(probe),
         serviceBaseUrl: artifacts.baseUrl,
-        serviceChatPath: "/chat",
-        serviceStreamPath: "/stream",
+        serviceChatPath: deployment.serviceChatPath || servicePaths.chatPath,
+        serviceStreamPath: deployment.serviceStreamPath || servicePaths.streamPath,
         serviceSessionName: artifacts.sessionName,
         serviceLogPath: artifacts.logPath,
         serviceStatusPath: artifacts.statusPath,
@@ -253,8 +257,8 @@ export async function checkModelDeploymentHealthService(input: {
       data: {
         serviceStatus: "error",
         serviceBaseUrl: artifacts.baseUrl,
-        serviceChatPath: "/chat",
-        serviceStreamPath: "/stream",
+        serviceChatPath: deployment.serviceChatPath || servicePaths.chatPath,
+        serviceStreamPath: deployment.serviceStreamPath || servicePaths.streamPath,
         serviceSessionName: artifacts.sessionName,
         serviceLogPath: artifacts.logPath,
         serviceStatusPath: artifacts.statusPath,
@@ -279,6 +283,7 @@ export async function stopModelDeploymentService(input: {
 
   const port = resolvePort(deployment.serviceBaseUrl, deployment.slug);
   const artifacts = buildLiveServiceArtifacts(deployment.inferHost.workspacePath, deployment.slug, port);
+  const servicePaths = defaultServicePathsForRunner(deployment.runnerKind);
 
   await stopLiveService({
     host: buildHostConfig(deployment.inferHost)!,
@@ -290,7 +295,8 @@ export async function stopModelDeploymentService(input: {
     data: {
       serviceStatus: "stopped",
       serviceBaseUrl: artifacts.baseUrl,
-      serviceChatPath: "/chat",
+      serviceChatPath: deployment.serviceChatPath || servicePaths.chatPath,
+      serviceStreamPath: deployment.serviceStreamPath || servicePaths.streamPath,
       serviceSessionName: artifacts.sessionName,
       serviceLogPath: artifacts.logPath,
       serviceStatusPath: artifacts.statusPath,

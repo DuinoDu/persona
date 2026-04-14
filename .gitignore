@@ -58,3 +58,7 @@ scripts/evals/*.bak_*
 scripts/evals/__pycache__/
 scripts/sft/*.bak_*
 scripts/sft/__pycache__/
+
+.conductor
+conductor.log
+conductor-terminal.log

@@ -31,8 +31,12 @@ export function parseSsePayload(block: string) {
   if (dataLines.length === 0) {
     return null;
   }
+  const joined = dataLines.join("\n").trim();
+  if (joined === "[DONE]") {
+    return { __sse_done: true } as Record<string, unknown>;
+  }
   try {
-    return JSON.parse(dataLines.join("\n")) as Record<string, unknown>;
+    return JSON.parse(joined) as Record<string, unknown>;
   } catch {
     return null;
   }

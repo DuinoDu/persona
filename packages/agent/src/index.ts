@@ -9,6 +9,7 @@ export * from "./inferenceTrace";
 export * from "./personaExport";
 export * from "./liveSessionRuntime";
 export * from "./remoteSse";
+export * from "./serviceProtocol";
 export * from "./services/inferBootstrapService";
 export * from "./services/deploymentService";
 export * from "./services/evalRunService";

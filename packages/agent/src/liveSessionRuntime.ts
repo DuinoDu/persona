@@ -4,10 +4,13 @@ import {
   buildRuntimeSignature,
   normalizeGenerationConfig,
   type PersonaMessage,
-  toRemoteGenerationBody,
   type GenerationConfig,
 } from "./personaRuntime";
 import { buildLiveServiceArtifacts, defaultServicePortForSlug, type InferHostJobConfig } from "./remoteJobs";
+import {
+  buildServiceInferenceBody,
+  defaultServicePathsForRunner,
+} from "./serviceProtocol";
 
 export interface LiveSessionLike {
   id: string;
@@ -55,9 +58,8 @@ export interface PreparedLiveSessionInference {
   runtimeSignature: ReturnType<typeof buildRuntimeSignature>;
   requestEnvelope: ReturnType<typeof buildPersonaInferenceRequest>;
   hostConfig: InferHostJobConfig;
-  inferenceBody: ReturnType<typeof toRemoteGenerationBody> & {
-    messages: ReturnType<typeof buildPersonaContext>["messages"];
-  };
+  inferenceBody: Record<string, unknown>;
+  streamInferenceBody: Record<string, unknown>;
   conversationMessages: ReturnType<typeof buildPersonaContext>["messages"];
   contextSettings: {
     maxInputTokens: number;
@@ -147,8 +149,9 @@ export function prepareLiveSessionInference(
     input.deployment.slug,
     port
   );
-  const chatUrl = artifacts.baseUrl + (input.deployment.serviceChatPath || "/chat");
-  const streamUrl = artifacts.baseUrl + (input.deployment.serviceStreamPath || "/stream");
+  const servicePaths = defaultServicePathsForRunner(input.deployment.runnerKind);
+  const chatUrl = artifacts.baseUrl + (input.deployment.serviceChatPath || servicePaths.chatPath);
+  const streamUrl = artifacts.baseUrl + (input.deployment.serviceStreamPath || servicePaths.streamPath);
   const context = buildPersonaContext({
     turns: input.turns,
     nextUserMessage: content,
@@ -191,10 +194,26 @@ export function prepareLiveSessionInference(
     sshUser: input.inferHost.sshUser,
     workspacePath: input.inferHost.workspacePath,
   };
-  const inferenceBody = {
+  const inferenceBody = buildServiceInferenceBody({
+    runnerKind: input.deployment.runnerKind,
+    deploymentId: input.deployment.id,
+    slug: input.deployment.slug,
+    baseModelPath: input.deployment.baseModelPath,
+    adapterPath: input.deployment.adapterPath ?? null,
     messages: requestEnvelope.messages,
-    ...toRemoteGenerationBody(requestEnvelope.generation),
-  };
+    generation: requestEnvelope.generation,
+    stream: false,
+  });
+  const streamInferenceBody = buildServiceInferenceBody({
+    runnerKind: input.deployment.runnerKind,
+    deploymentId: input.deployment.id,
+    slug: input.deployment.slug,
+    baseModelPath: input.deployment.baseModelPath,
+    adapterPath: input.deployment.adapterPath ?? null,
+    messages: requestEnvelope.messages,
+    generation: requestEnvelope.generation,
+    stream: true,
+  });
 
   return {
     content,
@@ -208,6 +227,7 @@ export function prepareLiveSessionInference(
     requestEnvelope,
     hostConfig,
     inferenceBody,
+    streamInferenceBody,
     conversationMessages: context.messages.filter((message) => message.role !== "system"),
     contextSettings,
   };

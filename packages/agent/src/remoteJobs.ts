@@ -6,6 +6,7 @@ import {
   buildOfflineEvalTraceDir,
   buildOfflineEvalTracePath,
 } from "./personaArtifacts";
+import { isVllmOpenAiRunner } from "./serviceProtocol";
 
 export {
   buildLiveServiceTraceDir,
@@ -28,6 +29,7 @@ export interface DeploymentJobConfig {
   adapterPath: string | null;
   systemPromptFile: string | null;
   runnerScriptPath: string | null;
+  runnerKind?: string | null;
   defaultDevice: string;
   slug?: string;
   deploymentId?: string;
@@ -317,7 +319,9 @@ export function buildLiveServiceLaunchSpec(input: {
   const slug = deployment.slug || "live-service";
   const listenHost = config.host || "127.0.0.1";
   const artifacts = buildLiveServiceArtifacts(host.workspacePath, slug, config.port);
-  const runnerScriptPath = `${host.workspacePath}/packages/agent/scripts/evals/run_live_chat_service_py312.sh`;
+  const runnerScriptPath = isVllmOpenAiRunner(deployment.runnerKind)
+    ? `${host.workspacePath}/packages/agent/scripts/evals/run_vllm_openai_service_py312.sh`
+    : `${host.workspacePath}/packages/agent/scripts/evals/run_live_chat_service_py312.sh`;
   const args = [
     runnerScriptPath,
     artifacts.logPath,
@@ -644,7 +648,21 @@ export async function probeLiveService(input: {
       method: "GET",
     });
   } catch {
-    healthJson = null;
+    try {
+      const modelList = await remoteHttpJson({
+        host: input.host,
+        url: `${input.baseUrl}/v1/models`,
+        method: "GET",
+      });
+      healthJson = {
+        ready: true,
+        loading: false,
+        api: "openai_compatible",
+        models: modelList,
+      };
+    } catch {
+      healthJson = null;
+    }
   }
 
   return {
