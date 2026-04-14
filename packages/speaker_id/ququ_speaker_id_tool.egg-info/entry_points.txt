@@ -1,0 +1,2 @@
+[console_scripts]
+ququ-speaker-id = speaker_id_tool.cli:app
